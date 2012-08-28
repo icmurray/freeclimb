@@ -7,11 +7,6 @@ import freeclimb.models._
 
 trait CrudApi {
 
-  /**
-   * Some type synonyms to help tidy the function signatures.
-   */
-  type ResultOrCA[T] = Validation[ConcurrentAccess[T], Revisioned[T]]
-  type SuccessOrCA[T] = Validation[ConcurrentAccess[T], Unit]
 
   /**
    * Climb related actions
