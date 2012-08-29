@@ -67,25 +67,25 @@ object User {
 
   private val usernameChars = lowerAlpha ++ upperAlpha ++ numerAlpha
   private def validateUsername(implicit username: String) = {
-    nonEmpty                    .liftFailNel <*
-    maxLength(20)               .liftFailNel <*
-    onlyContains(usernameChars) .liftFailNel
+    nonEmpty                    .toValidationNEL <*
+    maxLength(20)               .toValidationNEL <*
+    onlyContains(usernameChars) .toValidationNEL
   }
 
   private def validateRealName(name: Option[String]) = name match {
     case None => name.success
     case Some(name) => {
-      nonEmpty(name)      .liftFailNel <*
-      maxLength(50)(name) .liftFailNel
+      nonEmpty(name)      .toValidationNEL <*
+      maxLength(50)(name) .toValidationNEL
     }
   }
 
   private def validateEmail(implicit email: Option[String]): Validation[String, Option[String]] = email.success
 
   private def validateConfirmed(email: Option[String], confirmed: Option[Boolean]) = (email, confirmed) match {
-    case (None, None)       => None.success
-    case (Some(e), Some(c)) => Some(c).success
-    case _                  => "Confirmation failed.".fail
+    case (None, None)       => Success(None)
+    case (Some(e), Some(c)) => Success(Some(c))
+    case _                  => Failure("Confirmation failed.")
   }
 
 }

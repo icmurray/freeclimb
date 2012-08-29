@@ -112,8 +112,8 @@ object Climb {
    */
 
   private def validateTitle(implicit title: String) = {
-    nonEmpty      .liftFailNel <*
-    maxLength(30) .liftFailNel
+    nonEmpty      .toValidationNEL <*
+    maxLength(30) .toValidationNEL
   }
 
   private def validateDescription(implicit desc: String): Validation[String, String] = nonEmpty

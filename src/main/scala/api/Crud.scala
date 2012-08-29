@@ -15,12 +15,4 @@ trait CrudApi {
   def deleteClimb(climb: Revisioned[Climb]): SuccessOrCA[Climb]
   def getClimb(name: String): SessionReader[Option[Climb]]
 
-  def createAndDelete(climb: Climb): SuccessOrCA[Climb] = for {
-    val created <- createClimb(climb) if created.isSuccess
-    val revisionedClimb = created match {
-      case Success(revisionedClimb) => revisionedClimb
-    }
-
-  } yield deleteClimb(revisionedClimb)
-
 }
