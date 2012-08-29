@@ -88,7 +88,8 @@ object Climb {
             crag: Crag,
             grade: Grade,
             tags: Set[Tag]) = (
-      
+
+    validateName(name)               .enrichAs("name")        |@|
     validateTitle(title)             .enrichAs("title")       |@|
     validateDescription(description) .enrichAs("description")
 
@@ -110,6 +111,13 @@ object Climb {
   /**
    * Validation functions for each field of Climb
    */
+  
+  private val slugChars = lowerAlpha ++ upperAlpha ++ numerAlpha
+  private def validateName(implicit name: String) = {
+    nonEmpty                .toValidationNEL <*
+    maxLength(20)           .toValidationNEL <*
+    onlyContains(slugChars) .toValidationNEL
+  }
 
   private def validateTitle(implicit title: String) = {
     nonEmpty      .toValidationNEL <*
