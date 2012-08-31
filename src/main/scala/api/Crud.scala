@@ -14,14 +14,8 @@ trait CrudApi {
   /**
    * Climb related actions
    */
-  def createClimb(climb: Climb): ActionResult[Climb] = ApiAction { session =>
-    climbDao.create(climb).run.runWithinTransaction(session.dbConnection)
-  }
-
-  def updateClimb(climb: Revisioned[Climb]): ActionResult[Climb] = ApiAction { session =>
-    climbDao.update(climb).run.run(session.dbConnection)
-  }
-
+  def createClimb(climb: Climb): ActionResult[Climb] = climbDao.create(climb)
+  def updateClimb(climb: Revisioned[Climb]): ActionResult[Climb] = climbDao.update(climb)
   def deleteClimb(climb: Revisioned[Climb]): ActionSuccess[Climb]
   def getClimb(name: String): ApiAction[Option[Revisioned[Climb]]]
 
@@ -33,21 +27,17 @@ trait CrudApi {
   def deleteCrag(crag: Revisioned[Crag]): ActionSuccess[Crag]
   def getCrag(name: String): ApiAction[Option[Crag]]
 
-  /**
-   * Some type synonyms to help tidy the function signatures.
-   */
-  type ActionResult[T] = DisjunctionT[ApiAction, ConcurrentAccess, Revisioned[T]]
-  type ActionSuccess[T] = DisjunctionT[ApiAction, ConcurrentAccess, Unit]
-
-  /**
-   * Some implicit conversions to make writing actions a bit less verbose
-   */
-  private implicit def apiAction2EitherT[A,B](action: ApiAction[Disjunction[A,B]]): DisjunctionT[ApiAction,A,B] = EitherT(action)
-
   // This is only here to check that I've setup the ApiAction's implicit
   // functor and monad instances correctly.  I'll remove it later.
-  def createAndDelete(climb: Climb) = for {
+  private def createAndDelete(climb: Climb) = for {
     created <- createClimb(climb)
   } yield deleteClimb(created)
+
+  // Again, this is onyl really here as a check that it works.
+  private def createUpdateThenDelete(climb: Climb): ActionSuccess[Climb] = for {
+    created <- climbDao.create(climb)
+    updated <- climbDao.update(created)
+    updatedAgain <- updateClimb(updated)
+  } yield climbDao.delete(updated)
 
 }

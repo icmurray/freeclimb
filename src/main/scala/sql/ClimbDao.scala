@@ -2,6 +2,7 @@ package freeclimb.sql
 
 import anorm._
 
+import freeclimb.api._
 import freeclimb.models._
 
 /**
@@ -10,7 +11,8 @@ import freeclimb.models._
  * Defines lower-level domai-model access for Climbs.  Mostly CRUD.
  */
 trait ClimbDao extends Repository[Climb] {
-  def get(name: String): DB[Option[Climb]] = DB { implicit connection =>
+  def get(name: String): ApiAction[Option[Climb]] = ApiAction { session =>
+    implicit val connection = session.dbConnection
     val result: Boolean = SQL("Select 1").execute()
     None
   }
