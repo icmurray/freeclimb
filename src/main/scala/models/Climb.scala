@@ -93,7 +93,7 @@ object Climb {
     validateTitle(title)             .enrichAs("title")       |@|
     validateDescription(description) .enrichAs("description")
 
-  ) { case _ => new Climb ( name, title, description, crag, grade, tags): Climb }
+  ) { case _ => new Climb ( name, title, description, crag, grade, tags): Climb }.disjunction
 
   def makeClimbUnsafe(
       name: String,
