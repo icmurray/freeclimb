@@ -14,7 +14,7 @@ trait CrudApi {
    * Climb related actions
    */
   def createClimb(climb: Climb): ActionResult[Climb] = ApiAction { session =>
-    climbDao.create(climb)(session.dbConnection)
+    climbDao.create(climb).runWithinTransaction(session.dbConnection)
   }
 
   def updateClimb(climb: Revisioned[Climb]): ActionResult[Climb]

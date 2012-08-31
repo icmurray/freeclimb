@@ -9,5 +9,5 @@ import freeclimb.models._
  * Defines common CRUD functions on a repository
  */
 trait Repository[M] {
-  def create(m: M)(implicit connection: Connection): Disjunction[ConcurrentAccess[M], Revisioned[M]]
+  def create(m: M): DB[Disjunction[ConcurrentAccess[M], Revisioned[M]]]
 }
