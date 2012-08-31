@@ -36,28 +36,13 @@ trait CrudApi {
   /**
    * Some type synonyms to help tidy the function signatures.
    */
-
-  // NOTE: I think it'll be necessary to drop the type parameter from
-  // `ConcurrentAccess` in order to fix the type on the left of the
-  // `Disjunction`.  I think this will be necessary in order that a
-  // `ActionResult[Climb]` and `ActionResult[Crag]` can compose.
-  type ActionResult[T] = DisjunctionT[ApiAction, ConcurrentAccess[T], Revisioned[T]]
-  type ActionSuccess[T] = DisjunctionT[ApiAction, ConcurrentAccess[T], Unit]
+  type ActionResult[T] = DisjunctionT[ApiAction, ConcurrentAccess, Revisioned[T]]
+  type ActionSuccess[T] = DisjunctionT[ApiAction, ConcurrentAccess, Unit]
 
   /**
    * Some implicit conversions to make writing actions a bit less verbose
    */
   private implicit def apiAction2EitherT[A,B](action: ApiAction[Disjunction[A,B]]): DisjunctionT[ApiAction,A,B] = EitherT(action)
-
-  // This is here to demonstrate that by ConcurrentAccess taking a type
-  // parameter, and composing two ActionResults about Climbs and Crags together
-  // that you get an unusual return type.
-  def createClimbAndCrag(
-      climb: Climb,
-      crag: Crag): DisjunctionT[ApiAction, ConcurrentAccess[_ >: Climb with Crag <: ScalaObject], Revisioned[Climb]] = for {
-    createdClimb <- createClimb(climb)
-    createdCrag <- createCrag(crag)
-  } yield createdClimb
 
   // This is only here to check that I've setup the ApiAction's implicit
   // functor and monad instances correctly.  I'll remove it later.
