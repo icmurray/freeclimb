@@ -1,5 +1,7 @@
 package freeclimb.api
 
+import java.sql.Connection
+
 import freeclimb.models.User
 
 /**
@@ -12,4 +14,5 @@ import freeclimb.models.User
  */
 trait ApiSession {
   val user: Option[User]
+  val dbConnection: Connection
 }

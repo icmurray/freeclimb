@@ -1,13 +1,22 @@
 package freeclimb.api
 
+import scalaz._
+import Scalaz._
+
 import freeclimb.models._
+import freeclimb.sql._
 
 trait CrudApi {
+
+  val climbDao: ClimbDao
 
   /**
    * Climb related actions
    */
-  def createClimb(climb: Climb): ActionResult[Climb]
+  def createClimb(climb: Climb): ActionResult[Climb] = ApiAction { session =>
+    climbDao.create(climb)(session.dbConnection)
+  }
+
   def updateClimb(climb: Revisioned[Climb]): ActionResult[Climb]
   def deleteClimb(climb: Revisioned[Climb]): ActionSuccess[Climb]
   def getClimb(name: String): ApiAction[Option[Revisioned[Climb]]]

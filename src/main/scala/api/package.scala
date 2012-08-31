@@ -21,4 +21,10 @@ package object api {
   // I don't really like the name "\/".
   type Disjunction[+A,+B] = \/[A,B]
   type DisjunctionT[F[+_], +A, +B] = EitherT[F,A,B]
+
+
+  /**
+   * Some implicit conversions to make writing actions a bit less verbose
+   */
+  implicit def apiAction2EitherT[A](a: ApiAction[Disjunction[ConcurrentAccess[A], Revisioned[A]]]) = EitherT(a)
 }
