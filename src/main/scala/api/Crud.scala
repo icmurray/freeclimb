@@ -1,8 +1,5 @@
 package freeclimb.api
 
-import scalaz._
-import Scalaz._
-
 import freeclimb.models._
 
 trait CrudApi {
@@ -13,9 +10,15 @@ trait CrudApi {
   def createClimb(climb: Climb): ActionResult[Climb]
   def updateClimb(climb: Revisioned[Climb]): ActionResult[Climb]
   def deleteClimb(climb: Revisioned[Climb]): ActionSuccess[Climb]
-  def getClimb(name: String): ApiAction[Option[Climb]]
+  def getClimb(name: String): ApiAction[Option[Revisioned[Climb]]]
 
+  /**
+   * Crag related actions
+   */
   def createCrag(crag: Crag): ActionResult[Crag]
+  def updateCrag(crag: Revisioned[Crag]): ActionResult[Crag]
+  def deleteCrag(crag: Revisioned[Crag]): ActionSuccess[Crag]
+  def getCrag(name: String): ApiAction[Option[Crag]]
 
   // This is here to demonstrate that by ConcurrentAccess taking a type
   // parameter, and composing two ActionResults about Climbs and Crags together
