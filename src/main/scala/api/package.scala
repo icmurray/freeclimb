@@ -3,7 +3,8 @@ package freeclimb
 import scalaz._
 import Scalaz._
 
-import freeclimb.models._
+import _root_.freeclimb.common._
+import _root_.freeclimb.models._
 
 package object api {
   
@@ -17,10 +18,6 @@ package object api {
   // `ActionResult[Climb]` and `ActionResult[Crag]` can compose.
   type ActionResult[T] = DisjunctionT[ApiAction, ConcurrentAccess[T], Revisioned[T]]
   type ActionSuccess[T] = DisjunctionT[ApiAction, ConcurrentAccess[T], Unit]
-
-  // I don't really like the name "\/".
-  type Disjunction[+A,+B] = \/[A,B]
-  type DisjunctionT[F[+_], +A, +B] = EitherT[F,A,B]
 
 
   /**
