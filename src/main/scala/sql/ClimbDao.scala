@@ -8,7 +8,5 @@ import freeclimb.models._
  * Defines lower-level domai-model access for Climbs.  Mostly CRUD.
  */
 trait ClimbDao extends Repository[Climb] {
-
-
-
+  def get(name: String): DB[Option[Climb]]
 }
