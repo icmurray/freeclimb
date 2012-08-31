@@ -18,6 +18,7 @@ import freeclimb.models._
  */
 trait CragDao extends Repository[Crag] {
 
+  /** TODO: SQL exception handling. */
   override def create(crag: Crag) = ApiAction { session =>
     implicit val connection = session.dbConnection
 
@@ -31,10 +32,7 @@ trait CragDao extends Repository[Crag] {
     ).executeInsert()
 
     revision match {
-      case Some(rev) => new Revisioned[Crag] {
-        override val revision = rev
-        override val model = crag
-      }.right
+      case Some(rev) => new Revisioned[Crag](rev, crag).right
       case None      => ConcurrentUpdate().left
     }
   }
