@@ -18,7 +18,20 @@ import freeclimb.models._
 case class ApiAction[+A](g: ApiSession => A) {
 
   /** Run the action by passing it an ApiSession */
-  def apply(s: ApiSession) = g(s)
+  def apply(s: ApiSession) = {
+    val connection = s.dbConnection
+    try{
+      connection.setAutoCommit(false)
+      val result = g(s)
+      connection.commit()
+      result
+    } catch {
+      case e => connection.rollback() ; throw e
+    } finally {
+      connection.setAutoCommit(true)
+      connection.close()
+    }
+  }
 
   /** Synonym for apply() */
   def runWith(s: ApiSession) = apply(s)
