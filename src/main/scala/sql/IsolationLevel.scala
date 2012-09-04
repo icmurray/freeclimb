@@ -2,21 +2,33 @@ package freeclimb.sql
 
 import java.sql.Connection
 
-object IsolationLevel extends Enumeration {
-  type IsolationLevel = Value
-
-  /** Define them in order of strictness. */
-  val TransactionNone            = Value(0, "TRANSACTION_NONE")
-  val TransactionReadUnCommitted = Value(1, "TRANSACTION_READ_UNCOMMITTED")
-  val TransactionReadCommitted   = Value(2, "TRANSACTION_READ_COMMITTED")
-  val TransactionRepeatableRead  = Value(3, "TRANSACTION_REPEATABLE_READ")
-  val TransactionSerializable    = Value(4, "TRANSACTION_SERIALIZABLE")
-
-  def toJdbcLevel(level: IsolationLevel): Int = level match {
-    case TransactionNone            => Connection.TRANSACTION_NONE
-    case TransactionReadUnCommitted => Connection.TRANSACTION_READ_UNCOMMITTED
-    case TransactionReadCommitted   => Connection.TRANSACTION_READ_COMMITTED
-    case TransactionRepeatableRead  => Connection.TRANSACTION_REPEATABLE_READ
-    case TransactionSerializable    => Connection.TRANSACTION_SERIALIZABLE
-  }
+sealed trait IsolationLevel {
+  val jdbcLevel: Int
 }
+
+trait TransactionNone extends IsolationLevel {
+  override val jdbcLevel = Connection.TRANSACTION_NONE
+}
+
+trait TransactionReadUncommitted extends TransactionNone {
+  override val jdbcLevel = Connection.TRANSACTION_READ_UNCOMMITTED
+}
+
+trait TransactionReadCommitted extends TransactionReadUncommitted {
+  override val jdbcLevel = Connection.TRANSACTION_READ_COMMITTED
+}
+
+trait TransactionRepeatableRead extends TransactionReadCommitted {
+  override val jdbcLevel = Connection.TRANSACTION_REPEATABLE_READ
+}
+
+trait TransactionSerializable extends TransactionRepeatableRead {
+  override val jdbcLevel = Connection.TRANSACTION_SERIALIZABLE
+}
+
+object TransactionNone extends TransactionNone
+object TransactionReadUncommitted extends TransactionReadUncommitted
+object TransactionReadCommitted extends TransactionReadCommitted
+object TransactionRepeatableRead extends TransactionRepeatableRead
+object TransactionSerializable extends TransactionSerializable
+

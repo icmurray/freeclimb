@@ -3,6 +3,7 @@ package freeclimb.api
 import java.sql.Connection
 
 import freeclimb.models.User
+import freeclimb.sql.IsolationLevel
 
 /**
  * The ApiSession trait.
@@ -15,4 +16,9 @@ import freeclimb.models.User
 trait ApiSession {
   val user: Option[User]
   val dbConnection: Connection
+}
+
+trait DbSession[+I] {
+  val dbConnection: Connection
+  val level: IsolationLevel
 }
