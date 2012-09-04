@@ -18,8 +18,8 @@ trait ApiSession {
   val dbConnection: Connection
 }
 
-trait DbSession[+I] {
+trait DbSession[+I <: IsolationLevel] {
   val dbConnection: Connection
-  val level: IsolationLevel
-  val jdbcLevel = level.jdbcLevel
+  val level: I
+  lazy val jdbcLevel = level.jdbcLevel
 }
