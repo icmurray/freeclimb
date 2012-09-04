@@ -10,11 +10,15 @@ case class Action[+A, -I <: IsolationLevel](g: DbSession[I] => A) {
 
   def apply(s: DbSession[I]) = g(s)
 
-  /** Run the action by passing it an DbSession */
+  /** Synonym for apply() */
+  def runWith(s: DbSession[I]) = apply(s)
+
+  /** Run the action in a transaction. */
    def runInTransaction(s: DbSession[I]) = {
     val connection = s.dbConnection
     try{
       connection.setAutoCommit(false)
+      connection.setTransactionIsolation(s.jdbcLevel)
       val result = g(s)
       connection.commit()
       result
@@ -25,9 +29,6 @@ case class Action[+A, -I <: IsolationLevel](g: DbSession[I] => A) {
       connection.close()
     }
   }
-
-  /** Synonym for apply() */
-  def runWith(s: DbSession[I]) = apply(s)
 
   def map[B](f: A => B): Action[B,I] = Action[B,I]{ s =>
     val a: A = g(s)

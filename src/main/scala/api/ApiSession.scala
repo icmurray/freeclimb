@@ -21,4 +21,5 @@ trait ApiSession {
 trait DbSession[+I] {
   val dbConnection: Connection
   val level: IsolationLevel
+  val jdbcLevel = level.jdbcLevel
 }
