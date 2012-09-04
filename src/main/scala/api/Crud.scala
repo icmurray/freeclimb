@@ -24,6 +24,20 @@ trait CrudApi {
   def deleteClimb(climb: Revisioned[Climb]) = climbDao.delete(climb)
   def getClimb(name: String)                = climbDao.get(name)
 
+  // These are here to check that the isolation level checking works.
+  // This one should compile:
+  def runCreateClimbWorks(climb: Climb)(session: DbSession[TransactionSerializable]): Disjunction[ConcurrentAccess, Revisioned[Climb]] =
+    createClimb(climb).runInTransaction(session)
+
+  // As should this one:
+  def runCreateClimbWorksToo(climb: Climb)(session: DbSession[TransactionRepeatableRead]): Disjunction[ConcurrentAccess, Revisioned[Climb]] =
+    createClimb(climb).runInTransaction(session)
+
+  // And when uncommented, this one shouldn't:
+  //def runCreateClimbShouldNotWork(climb: Climb)(session: DbSession[TransactionNone]): Disjunction[ConcurrentAccess, Revisioned[Climb]] =
+  //  createClimb(climb).runInTransaction(session)
+
+
   /**
    * Crag related actions.  Again, these just pass straight through to the DAO
    * layer.
