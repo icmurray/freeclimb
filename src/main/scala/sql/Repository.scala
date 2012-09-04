@@ -11,8 +11,8 @@ import freeclimb.models.Revisioned
  */
 trait Repository[M] {
 
-  def create(m: M):             DisjunctionT[ApiAction, ConcurrentAccess, Revisioned[M]]
-  def update(m: Revisioned[M]): DisjunctionT[ApiAction, ConcurrentAccess, Revisioned[M]]
-  def delete(m: Revisioned[M]): DisjunctionT[ApiAction, ConcurrentAccess, Unit]
+  def create(m: M):             ActionResult[M, TransactionSerializable]
+  def update(m: Revisioned[M]): ActionResult[M, TransactionSerializable]
+  def delete(m: Revisioned[M]): ActionResult[M, TransactionSerializable]
 
 }

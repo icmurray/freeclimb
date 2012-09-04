@@ -1,13 +1,14 @@
 package freeclimb.api
 
 import freeclimb.models._
+import freeclimb.sql._
 
 /**
  * Defines search-related api actions
  */
 trait SearchApi {
 
-  def findClimb(params: SearchParams): ApiAction[SearchResult[Revisioned[Climb]]]
+  def findClimb(params: SearchParams): Action[SearchResult[Revisioned[Climb]], TransactionReadCommitted]
 
 }
 

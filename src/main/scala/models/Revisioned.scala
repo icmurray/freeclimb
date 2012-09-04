@@ -8,7 +8,7 @@ package freeclimb.models
  *
  * @param model is the underlying model value at the given revision.
  */
-case class Revisioned[T] (
+case class Revisioned[+T] (
   val revision: Long,
   val model: T
 )

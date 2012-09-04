@@ -33,14 +33,14 @@ trait CrudApi {
   def deleteCrag(crag: Revisioned[Crag]) = cragDao.delete(crag)
   def getCrag(name: String)              = cragDao.get(name)
 
-  // This is only here to check that I've setup the ApiAction's implicit
+  // This is only here to check that I've setup the Action's implicit
   // functor and monad instances correctly.  I'll remove it later.
   private def createAndDelete(climb: Climb) = for {
     created <- createClimb(climb)
   } yield deleteClimb(created)
 
   // Again, this is onyl really here as a check that it works.
-  private def createUpdateThenDelete(climb: Climb): ActionSuccess[Climb] = for {
+  private def createUpdateThenDelete(climb: Climb) = for {
     created <- climbDao.create(climb)
     updated <- climbDao.update(created)
     updatedAgain <- updateClimb(updated)

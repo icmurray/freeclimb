@@ -19,7 +19,7 @@ import freeclimb.models._
 trait CragDao extends Repository[Crag] {
 
   /** TODO: SQL exception handling. */
-  override def create(crag: Crag) = ApiAction { session =>
+  override def create(crag: Crag): ActionResult[Crag, TransactionSerializable] = ActionT { session =>
     implicit val connection = session.dbConnection
 
     val revision: Option[Long] = SQL(
@@ -37,13 +37,11 @@ trait CragDao extends Repository[Crag] {
     }
   }
 
-  def get(name: String): ApiAction[Option[Revisioned[Crag]]] = ApiAction { session =>
+  def get(name: String): Action[Option[Revisioned[Crag]], TransactionReadCommitted] = Action { session =>
     implicit val connection = session.dbConnection
     val result: Boolean = SQL("Select 1").execute()
     None
   }
 
-  private implicit def action2EitherT[A,B](
-    action: ApiAction[Disjunction[A,B]]): DisjunctionT[ApiAction, A, B] = EitherT(action)
 }
 
