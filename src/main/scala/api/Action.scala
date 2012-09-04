@@ -44,19 +44,19 @@ case class Action[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
  * This trait defines some implicit conversions for inter-operating with
  * scalaz's type classes.
  */
-// trait ActionInstances {
-// 
-//   /**
-//    * Ensure that Action is seen as a Monad and a Functor when using scalaz.
-//    * For example, this is necessary when using it with monad transformers.
-//    */
-//   implicit val apiActionInstance = new Monad[Action] with Functor[Action] {
-//     override def bind[A, B](fa: Action[A])(f: A => Action[B]): Action[B] = fa flatMap f
-//     override def point[A](a: => A): Action[A] = Action(_ => a )
-//   }
-// }
-// 
-// /**
-//  * Companion object that captures all the implicits defined above
-//  */
-// object Action extends ActionInstances
+trait ActionInstances {
+
+  /**
+   * Ensure that Action is seen as a Monad and a Functor when using scalaz.
+   * For example, this is necessary when using it with monad transformers.
+   */
+  implicit def actionInstance[M[+_], I <: IsolationLevel](implicit M: Monad[M]) = new Monad[({type l[a] = Action[M, a, I]})#l] with Functor[({type l[a] = Action[M, a, I]})#l] {
+    override def bind[A, B](fa: Action[M,A,I])(f: A => Action[M,B,I]): Action[M,B,I] = fa flatMap f
+    override def point[A](a: => A): Action[M,A,I] = Action[M,A,I] { _ => M.point(a) }
+  }
+}
+
+/**
+ * Companion object that captures all the implicits defined above
+ */
+object Action extends ActionInstances
