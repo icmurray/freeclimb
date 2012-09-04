@@ -19,7 +19,7 @@ import freeclimb.models._
 trait CragDao extends Repository[Crag] {
 
   /** TODO: SQL exception handling. */
-  override def create(crag: Crag): ActionResult[Crag, TransactionSerializable] = ActionT { session =>
+  override def create(crag: Crag) = ActionT { session =>
     implicit val connection = session.dbConnection
 
     val revision: Option[Long] = SQL(
