@@ -6,7 +6,7 @@ import Scalaz._
 import freeclimb.models._
 import freeclimb.sql.IsolationLevel
 
-case class Action[+A, -I <: IsolationLevel](g: DbSession[I] => A) {
+case class Action[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
 
   def apply(s: DbSession[I]) = g(s)
 
@@ -30,17 +30,12 @@ case class Action[+A, -I <: IsolationLevel](g: DbSession[I] => A) {
     }
   }
 
-  def map[B](f: A => B): Action[B,I] = Action[B,I]{ s =>
-    val a: A = g(s)
-    val b: B = f(a)
-    b
+  def map[B](f: A => B)(implicit F: Functor[M]): Action[M,B,I] = Action[M,B,I]{ s =>
+    F.map(g(s))(f)
   }
 
-  def flatMap[B, II <: I](f: A => Action[B,II]): Action[B,II] = Action[B,II]{ s: DbSession[II] =>
-    val a: A = g(s)
-    val aB: Action[B,II] = f(a)
-    val b: B = aB(s)
-    b
+  def flatMap[B, II <: I](f: A => Action[M,B,II])(implicit M: Bind[M]): Action[M,B,II] = Action[M,B,II]{ s =>
+    M.bind(g(s))(f(_)(s))
   }
 
 }
