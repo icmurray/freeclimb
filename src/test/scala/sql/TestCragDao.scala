@@ -103,28 +103,6 @@ class CragDaoTest extends FunSpec
       }
 
       it("should return a concurrent update if crags with the same name are created at the same time") (pending)
-
-        //// The first transaction
-        //println("Before first transaction")
-        //val firstSession = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        //firstSession.dbConnection.setAutoCommit(false)
-        //firstSession.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
-        //cragDao.create(burbage).runWith(firstSession)
-
-        //// Now, a second transaction, whilsts the first is still running
-        //println("Before second transaction")
-        //val secondSession = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        //println("Before autocommit")
-        //secondSession.dbConnection.setAutoCommit(false)
-        //println("Before setting level")
-        //secondSession.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
-        //println("Before runWith")
-        //cragDao.create(burbage).runWith(secondSession)
-        //println ("Before both commits")
-        //secondSession.dbConnection.commit()
-        //firstSession.dbConnection.commit()
-
-      //}
     }
 
     describe("The update action") {
@@ -174,13 +152,55 @@ class CragDaoTest extends FunSpec
 
     describe("The delete action") {
 
-      it("should delete an existing crag successfully") (pending)
+      it("should delete an existing crag successfully") {
 
-      it("should be possible to undelete a deleted crag") (pending)
+        val action = for {
+          val cragRev  <- cragDao.create(burbage)
+          val _ = cragRev.model should equal (burbage)
+          val _        <- cragDao.delete(cragRev)
+        } yield ()
 
-      it("should inform if the crag has been deleted concurrently") (pending)
+        run(action)
+        val someCrag = run(cragDao.get("burbage"))
+        someCrag should equal (None)
+      }
 
-      it("should inform if the crag has been edited concurrently") (pending)
+      it("should be possible to create a new crag with the same name of a previsouly deleted crag") {
+        val action = for {
+          val rev <- cragDao.create(burbage)
+          val _ <- cragDao.delete(rev)
+          val newRev <- cragDao.create(burbage)
+        } yield newRev
+
+        val newCrag = run(action)
+        newCrag fold (
+          error   => fail("Couldn't re-create deleted crag"),
+          cragRev => {
+            cragRev.model should equal (burbage)
+          }
+        )
+      }
+
+      it("should inform if the crag has been updated concurrently") {
+        val cragRev = run(cragDao.create(burbage)).toOption.get
+
+        val result = run(cragDao.delete(Revisioned[Crag](cragRev.revision-1, cragRev.model)))
+        result fold (
+          error       => {},
+          deletedCrag => fail("Delete should have failed")
+        )
+      }
+
+      it("should inform if the crag has been deleted concurrently") {
+        val cragRev = run(cragDao.create(burbage)).toOption.get
+        val _ = run(cragDao.delete(cragRev))
+
+        val result = run(cragDao.delete(Revisioned[Crag](cragRev.revision, cragRev.model)))
+        result fold (
+          error       => {},
+          deletedCrag => fail("Delete should have failed")
+        )
+      }
 
     }
   }

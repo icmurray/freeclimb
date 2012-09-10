@@ -52,8 +52,34 @@ trait CragDao extends Repository[Crag] {
 
   }
 
-  override def delete(crag: Revisioned[Crag]) = ActionT { session =>
-    if (false) { ConcurrentUpdate().left } else { crag.right }
+  override def delete(cragRev: Revisioned[Crag]) = ActionT { session =>
+
+    implicit val connection = session.dbConnection
+    try {
+
+      val currentRevision: Option[Revisioned[Crag]] = get(cragRev.model.name).runWith(session)
+      currentRevision match {
+        case None => ConcurrentUpdate().left
+        case Some(latest) if latest.revision != cragRev.revision => ConcurrentUpdate().left
+        case _ =>
+          val crag = cragRev.model
+
+          SQL(
+            """
+            DELETE from crags WHERE name = {name}
+            """
+          ).on(
+            "name"     -> crag.name
+          ).execute()
+          cragRev.right
+      }
+    } catch {
+      case e: SQLException => e.sqlError match {
+        case Some(SerializationFailure) => connection.rollback() ; ConcurrentUpdate().left
+        case _                          => connection.rollback() ; throw e
+      }
+      case e                            => connection.rollback() ; throw e
+    }
   }
 
   override def update(cragRev: Revisioned[Crag]) = ActionT { session =>
