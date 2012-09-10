@@ -34,30 +34,30 @@ class CragDaoTest extends FunSpec
     cleanTables()
   }
 
+  private def newSession() = TestDatabaseSessions.newSession(TransactionRepeatableRead)
+  private def run[M[+_], A](action: ActionT[M, A, TransactionRepeatableRead]) = {
+    action.runInTransaction(newSession())
+  }
+
   describe("Crag DAO") {
 
     describe("The get action") {
 
       it("should return the latest revision of a crag that exists") {
+
         // Create a new Crag, and update it.
-        var session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        val createAndUpdate = for {
-          val newCrag <- cragDao.create(burbage)
-          val newRevision = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE"))
-          val updatedCrag <- cragDao.update(newRevision)
-        } yield updatedCrag
-        val updatedCrag: Revisioned[Crag] = createAndUpdate.runInTransaction(session).toOption.get
+        val newCrag = run(cragDao.create(burbage)).toOption.get
+        val update = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE"))
+        val updatedCrag = run(cragDao.update(update)).toOption.get
 
         // Get the Crag, and check the results
-        session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        val latestCrag = cragDao.get("burbage").runInTransaction(session).get
+        val latestCrag = run(cragDao.get("burbage")).get
         latestCrag.revision should equal (updatedCrag.revision)
-        latestCrag.model should equal (Crag.makeUnsafe("burbage", "BURBAGE"))
+        latestCrag.model should equal (updatedCrag.model)
       }
 
       it("should return None if the crag does not exist") {
-        var session = TestDatabaseSessions.newSession()
-        val someCrag = cragDao.get("burbage").runInTransaction(session)
+        val someCrag = run(cragDao.get("burbage"))
         someCrag should equal (None)
       }
 
@@ -67,8 +67,7 @@ class CragDaoTest extends FunSpec
       
       it("should successfuly create a new crag") {
 
-        val session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        val result = cragDao.create(burbage).runInTransaction(session)
+        val result = run(cragDao.create(burbage))
 
         result.fold (
           error => fail ("Failed to create new Crag: " + error.toString),
@@ -77,8 +76,7 @@ class CragDaoTest extends FunSpec
             revision.model should equal (burbage)
 
             // Check the Crag was stored in the database
-            val newSession = TestDatabaseSessions.newSession()
-            val someStoredCrag = cragDao.get("burbage").runInTransaction(newSession)
+            val someStoredCrag = run(cragDao.get("burbage"))
             someStoredCrag match {
               case None             => fail ("Failed to obtain stored Crag.")
               case Some(storedCrag) => {
@@ -93,12 +91,10 @@ class CragDaoTest extends FunSpec
       it("should not create a crag if it already exists") {
 
         // Create the Crag initially.
-        var session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        cragDao.create(burbage).runInTransaction(session)
+        run(cragDao.create(burbage))
 
         // Now try to re-create it
-        session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        val result = cragDao.create(burbage).runInTransaction(session)
+        val result = run(cragDao.create(burbage))
 
         result.fold (
           error => {},
@@ -135,13 +131,11 @@ class CragDaoTest extends FunSpec
 
       it("should update an existing crag successfully") {
         // Create the Crag we're ging to update.
-        var session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        val firstRevision = cragDao.create(burbage).runInTransaction(session).toOption.get
+        val firstRevision = run(cragDao.create(burbage)).toOption.get
 
         val updatedCrag = Crag.makeUnsafe("burbage", "BURBAGE")
-        session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
         val rev: Revisioned[Crag] = Revisioned[Crag](firstRevision.revision, updatedCrag)
-        val result = cragDao.update(rev).runInTransaction(session)
+        val result = run(cragDao.update(rev))
 
         result.fold (
           error => fail ("Failed to update Crag: " + error.toString),
@@ -151,8 +145,7 @@ class CragDaoTest extends FunSpec
             revision.revision should be > (firstRevision.revision)
 
             // Check the update was stored in the database
-            session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-            val someStoredCrag = cragDao.get("burbage").runInTransaction(session)
+            val someStoredCrag = run(cragDao.get("burbage"))
             someStoredCrag match {
               case None             => fail ("Failed to obtain stored Crag.")
               case Some(storedCrag) => {
@@ -167,13 +160,10 @@ class CragDaoTest extends FunSpec
       it("should inform if the crag has been updated concurrently") {
 
         // First, create a Crag to update
-        var session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        val newCrag = cragDao.create(burbage).runInTransaction(session).toOption.get
+        val newCrag = run(cragDao.create(burbage)).toOption.get
 
         // Now, try to update it with a smaller revision number
-        session = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-        val result = cragDao.update(Revisioned[Crag](newCrag.revision-1, newCrag.model)).
-                             runInTransaction(session)
+        val result = run(cragDao.update(Revisioned[Crag](newCrag.revision-1, newCrag.model)))
         result fold (
           error       => {},
           updatedCrag => fail ("Update should have failed: " + updatedCrag)
