@@ -3,4 +3,4 @@ target/
 *.swp
 
 # Dev database.
-dev-db.pg
+freeclimb-dev.pg

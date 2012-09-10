@@ -9,4 +9,12 @@ resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/release
 
 libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.0-M3"
 
+
 libraryDependencies += "play" %% "anorm" % "2.1-08292012"
+
+libraryDependencies += "postgresql" % "postgresql" % "9.1-901-1.jdbc4"
+
+libraryDependencies += "com.googlecode.flyway" % "flyway-core" % "1.7"
+
+// Test deps
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test"

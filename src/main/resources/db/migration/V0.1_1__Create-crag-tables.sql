@@ -1,7 +1,5 @@
 -- Crag schema
 
-BEGIN;
-
 -- Revisions sequence generator for the whole table.  It's not important
 -- that a given crag's revision history is sequential, only that it's
 -- striclty increasing.increasing.
@@ -51,5 +49,3 @@ $BODY$ LANGUAGE plpgsql;
 CREATE TRIGGER on_crag_insert_or_update
     AFTER INSERT OR UPDATE ON crags
     FOR EACH ROW EXECUTE PROCEDURE record_crag();
-
-COMMIT;
