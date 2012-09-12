@@ -184,6 +184,47 @@ class CragDaoTest extends FunSpec
         )
       }
 
+      it("should inform if the crag is being updated concurrently in an other transaction") {
+
+        // Create a new Crag to work upon
+        val newCrag = run(cragDao.create(burbage)).toOption.get
+
+        // First, start a transaction that updates the new Crag, but don't complete it.
+        val update1 = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE"))
+        val session1 = newSession()
+        session1.dbConnection.setAutoCommit(false)
+        session1.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
+        val updatedCrag = cragDao.update(update1).runWith(session1)
+        updatedCrag.fold (
+          error => { session1.dbConnection.close() ; fail ("Couldn't update crag") },
+          success => success.model should equal (update1.model)
+        )
+
+        // Now, create a second session to update the same Crag concurrently.
+        val session2 = newSession()
+        session2.dbConnection.setAutoCommit(false)
+        session2.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
+
+        // The new Crag is updated within a new Thread
+        val update2 = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE BURBAGE"))
+        val f = future {
+          cragDao.update(update2).runInTransaction(session2)
+        }
+
+        // *try* to ensure the second transaction has started concurrently
+        // by pausing this Thread, giving the future time to execute.
+        Thread.sleep(100) 
+
+        // Finally, complete the first session.
+        session1.dbConnection.commit()
+
+        // We expect the second session to have failed.
+        f() fold (
+          error   => error should equal (ConcurrentUpdate()),
+          success => fail ("Concurrent update was not raised")
+        )
+      }
+
     }
 
     describe("The delete action") {
