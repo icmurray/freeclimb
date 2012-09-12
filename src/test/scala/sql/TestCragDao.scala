@@ -1,5 +1,7 @@
 package freeclimb.test.sql
 
+import scala.actors.Futures.future
+
 import java.sql.DriverManager
 
 import org.scalatest.{FunSpec, BeforeAndAfter}
@@ -102,7 +104,41 @@ class CragDaoTest extends FunSpec
         )
       }
 
-      it("should return a concurrent update if crags with the same name are created at the same time") (pending)
+      it("should return a concurrent update if crags with the same name are created at the same time") {
+
+        // First, start a transaction that creates a new Crag, but don't complete it.
+        val session1 = newSession()
+        session1.dbConnection.setAutoCommit(false)
+        session1.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
+        val newCrag = cragDao.create(burbage).runWith(session1)
+        newCrag.fold (
+          error => { session1.dbConnection.close() ; fail ("Couldn't create crag") },
+          success => success.model should equal (burbage)
+        )
+
+        // Now, create a second session to create the same Crag concurrently.
+        val session2 = newSession()
+        session2.dbConnection.setAutoCommit(false)
+        session2.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
+
+        // The new Crag is created within a new Thread
+        val f = future {
+          cragDao.create(burbage).runInTransaction(session2)
+        }
+
+        // *try* to ensure the second transaction has started concurrently
+        // by pausing this Thread, giving the future time to execute.
+        Thread.sleep(100) 
+
+        // Finally, complete the first session.
+        session1.dbConnection.commit()
+
+        // We expect the second session to have failed.
+        f() fold (
+          error   => error should equal (ConcurrentUpdate()),
+          success => fail ("Concurrent update was not raised")
+        )
+      }
     }
 
     describe("The update action") {
