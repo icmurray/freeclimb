@@ -53,13 +53,13 @@ class CragDaoTest extends FunSpec
         val updatedCrag = run(cragDao.update(update)).toOption.get
 
         // Get the Crag, and check the results
-        val latestCrag = run(cragDao.get("burbage")).get
+        val latestCrag = run(cragDao.get("burbage")).toOption.get.get
         latestCrag.revision should equal (updatedCrag.revision)
         latestCrag.model should equal (updatedCrag.model)
       }
 
       it("should return None if the crag does not exist") {
-        val someCrag = run(cragDao.get("burbage"))
+        val someCrag = run(cragDao.get("burbage")).toOption.get
         someCrag should equal (None)
       }
 
@@ -78,7 +78,7 @@ class CragDaoTest extends FunSpec
             revision.model should equal (burbage)
 
             // Check the Crag was stored in the database
-            val someStoredCrag = run(cragDao.get("burbage"))
+            val someStoredCrag = run(cragDao.get("burbage")).toOption.get
             someStoredCrag match {
               case None             => fail ("Failed to obtain stored Crag.")
               case Some(storedCrag) => {
@@ -135,7 +135,7 @@ class CragDaoTest extends FunSpec
 
         // We expect the second session to have failed.
         f() fold (
-          error   => error should equal (ConcurrentUpdate()),
+          error   => error should equal (EditConflict()),
           success => fail ("Concurrent update was not raised")
         )
       }
@@ -159,7 +159,7 @@ class CragDaoTest extends FunSpec
             revision.revision should be > (firstRevision.revision)
 
             // Check the update was stored in the database
-            val someStoredCrag = run(cragDao.get("burbage"))
+            val someStoredCrag = run(cragDao.get("burbage")).toOption.get
             someStoredCrag match {
               case None             => fail ("Failed to obtain stored Crag.")
               case Some(storedCrag) => {
@@ -220,7 +220,7 @@ class CragDaoTest extends FunSpec
 
         // We expect the second session to have failed.
         f() fold (
-          error   => error should equal (ConcurrentUpdate()),
+          error   => error should equal (EditConflict()),
           success => fail ("Concurrent update was not raised")
         )
       }
@@ -238,7 +238,7 @@ class CragDaoTest extends FunSpec
         } yield ()
 
         run(action)
-        val someCrag = run(cragDao.get("burbage"))
+        val someCrag = run(cragDao.get("burbage")).toOption.get
         someCrag should equal (None)
       }
 
@@ -291,12 +291,12 @@ class CragDaoTest extends FunSpec
         val rev3 = run(cragDao.update(Revisioned[Crag](rev2.revision,
                                                        Crag.makeUnsafe("burbage", "BURBAGE !!")))).toOption.get
 
-        val history = run(cragDao.history(burbage))
+        val history = run(cragDao.history(burbage)).toOption.get
         history.toList should equal (List(rev3, rev2, rev1))
       }
 
       it("should return the empty list for a Crag that does not exist") {
-        val history = run(cragDao.history(burbage))
+        val history = run(cragDao.history(burbage)).toOption.get
         history.toList should equal (Nil)
       }
 
@@ -306,8 +306,7 @@ class CragDaoTest extends FunSpec
           val _   <- cragDao.delete(rev)
         } yield ())
 
-        val history = run(cragDao.history(burbage))
-
+        val history = run(cragDao.history(burbage)).toOption.get
         history.toList should equal (Nil)
       }
 
@@ -322,7 +321,7 @@ class CragDaoTest extends FunSpec
         val newCrag = Crag.makeUnsafe("burbage", "BURBAGE")
         val newRev = run(cragDao.create(newCrag)).toOption.get
 
-        val history = run(cragDao.history(burbage))
+        val history = run(cragDao.history(burbage)).toOption.get
 
         history.toList should equal (List(newRev))
 
@@ -341,7 +340,7 @@ class CragDaoTest extends FunSpec
         } yield ()
 
         run(action)
-        val someCrag = run(cragDao.get("burbage"))
+        val someCrag = run(cragDao.get("burbage")).toOption.get
         someCrag should equal (None)
 
       }

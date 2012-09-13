@@ -8,7 +8,7 @@ import freeclimb.sql._
  */
 trait SearchApi {
 
-  def findClimb(params: SearchParams): Action[SearchResult[Revisioned[Climb]], TransactionReadCommitted]
+  def findClimb(params: SearchParams): ApiReadAction[SearchResult[Revisioned[Climb]]]
 
 }
 

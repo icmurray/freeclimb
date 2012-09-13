@@ -23,7 +23,7 @@ object CragDao extends CragDao
  */
 trait CragDao extends Repository[Crag] {
 
-  override def create(crag: Crag) = ActionT { session =>
+  override def create(crag: Crag) = ApiAction { session =>
     implicit val connection = session.dbConnection
 
     try{
@@ -44,7 +44,7 @@ trait CragDao extends Repository[Crag] {
 
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(UniqueViolation) => connection.rollback() ; ConcurrentUpdate().left
+        case Some(UniqueViolation) => connection.rollback() ; EditConflict().left
         case _                     => connection.rollback() ; throw e
       }
       case e => connection.rollback() ; throw e
@@ -52,107 +52,115 @@ trait CragDao extends Repository[Crag] {
 
   }
 
-  override def delete(cragRev: Revisioned[Crag]) = ActionT { session =>
+  override def delete(cragRev: Revisioned[Crag]) = ApiAction { session =>
 
     implicit val connection = session.dbConnection
     try {
 
-      val currentRevision: Option[Revisioned[Crag]] = get(cragRev.model.name).runWith(session)
-      currentRevision match {
-        case None => ConcurrentUpdate().left
-        case Some(latest) if latest.revision != cragRev.revision => ConcurrentUpdate().left
-        case _ =>
-          val crag = cragRev.model
+      get(cragRev.model.name).runWith(session).fold (
+        error => error.left,
+        currentRevision => currentRevision match {
 
-          SQL(
-            """
-            DELETE from crags WHERE name = {name}
-            """
-          ).on(
-            "name"     -> crag.name
-          ).execute()
-          cragRev.right
-      }
+          case None => EditConflict().left
+          case Some(latest) if latest.revision != cragRev.revision => EditConflict().left
+          case _ =>
+            val crag = cragRev.model
+
+            SQL(
+              """
+              DELETE from crags WHERE name = {name}
+              """
+            ).on(
+              "name"     -> crag.name
+            ).execute()
+            cragRev.right
+        }
+      )
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) => connection.rollback() ; ConcurrentUpdate().left
+        case Some(SerializationFailure) => connection.rollback() ; EditConflict().left
         case _                          => connection.rollback() ; throw e
       }
       case e                            => connection.rollback() ; throw e
     }
   }
 
-  override def purge(cragRev: Revisioned[Crag]) = ActionT { session =>
+  override def purge(cragRev: Revisioned[Crag]) = ApiAction { session =>
 
     implicit val connection = session.dbConnection
     try {
 
-      val currentRevision: Option[Revisioned[Crag]] = get(cragRev.model.name).runWith(session)
-      currentRevision match {
-        case None => ConcurrentUpdate().left
-        case Some(latest) if latest.revision != cragRev.revision => ConcurrentUpdate().left
-        case _ =>
-          val cragId = SQL(
-            """
-            SELECT crag_id FROM crag_history
+      get(cragRev.model.name).runWith(session).fold (
+        error => error.left,
+        currentRevision => currentRevision match {
+
+          case None => EditConflict().left
+          case Some(latest) if latest.revision != cragRev.revision => EditConflict().left
+          case _ =>
+            val cragId = SQL(
+              """
+              SELECT crag_id FROM crag_history
+                WHERE name = {name}
+                  AND revision = {revision}
+              """
+            ).on(
+              "name"     -> cragRev.model.name,
+              "revision" -> cragRev.revision
+            ).as(scalar[Long].single)
+
+            SQL(
+              """
+              DELETE from crag_history
+                WHERE crag_id = {crag_id};
+              DELETE FROM crags
+                WHERE id = {crag_id}
+              """
+            ).on(
+              "crag_id" -> cragId
+            ).execute()
+            cragRev.right
+        }
+      )
+    } catch {
+      case e: SQLException => e.sqlError match {
+        case Some(SerializationFailure) => connection.rollback() ; EditConflict().left
+        case _                          => connection.rollback() ; throw e
+      }
+      case e                            => connection.rollback() ; throw e
+    }
+  }
+
+  override def update(cragRev: Revisioned[Crag]) = ApiAction { session =>
+    implicit val connection = session.dbConnection
+    try {
+
+      get(cragRev.model.name).runWith(session) fold (
+        error => error.left,
+        currentRevision => currentRevision match {
+          case None => EditConflict().left
+          case Some(latest) if latest.revision != cragRev.revision => EditConflict().left
+          case _ =>
+            val crag = cragRev.model
+            val nextRevision: Long = SQL("SELECT nextval('crag_revision_seq');").as(scalar[Long].single)
+
+            SQL(
+              """
+              UPDATE crags SET
+                title = {title},
+                revision = {revision}
               WHERE name = {name}
-                AND revision = {revision}
-            """
-          ).on(
-            "name"     -> cragRev.model.name,
-            "revision" -> cragRev.revision
-          ).as(scalar[Long].single)
-
-          SQL(
-            """
-            DELETE from crag_history
-              WHERE crag_id = {crag_id};
-            DELETE FROM crags
-              WHERE id = {crag_id}
-            """
-          ).on(
-            "crag_id" -> cragId
-          ).execute()
-          cragRev.right
-      }
+              """
+            ).on(
+              "title"    -> crag.title,
+              "revision" -> nextRevision,
+              "name"     -> crag.name
+            ).execute()
+            new Revisioned[Crag](nextRevision, crag).right
+        }
+      )
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) => connection.rollback() ; ConcurrentUpdate().left
-        case _                          => connection.rollback() ; throw e
-      }
-      case e                            => connection.rollback() ; throw e
-    }
-  }
-
-  override def update(cragRev: Revisioned[Crag]) = ActionT { session =>
-    implicit val connection = session.dbConnection
-    try {
-
-      val currentRevision: Option[Revisioned[Crag]] = get(cragRev.model.name).runWith(session)
-      currentRevision match {
-        case None => ConcurrentUpdate().left
-        case Some(latest) if latest.revision != cragRev.revision => ConcurrentUpdate().left
-        case _ =>
-          val crag = cragRev.model
-          val nextRevision: Long = SQL("SELECT nextval('crag_revision_seq');").as(scalar[Long].single)
-
-          SQL(
-            """
-            UPDATE crags SET
-              title = {title},
-              revision = {revision}
-            WHERE name = {name}
-            """
-          ).on(
-            "title"    -> crag.title,
-            "revision" -> nextRevision,
-            "name"     -> crag.name
-          ).execute()
-          new Revisioned[Crag](nextRevision, crag).right
-      }
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) => connection.rollback() ; ConcurrentUpdate().left
+        case Some(SerializationFailure) => connection.rollback() ; EditConflict().left
         case _                          => connection.rollback() ; throw e
       }
       case e                            => connection.rollback() ; throw e
@@ -160,7 +168,7 @@ trait CragDao extends Repository[Crag] {
 
   }
 
-  def get(name: String): Action[Option[Revisioned[Crag]], TransactionReadCommitted] = Action { session =>
+  def get(name: String): ApiReadAction[Option[Revisioned[Crag]]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
 
     SQL(
@@ -170,10 +178,10 @@ trait CragDao extends Repository[Crag] {
       """
     ).on(
       "name" -> name
-    ).as(revisionedCrag.singleOpt)
+    ).as(revisionedCrag.singleOpt).right
   }
 
-  def history(crag: Crag): Action[Seq[Revisioned[Crag]], TransactionReadCommitted] = Action { session =>
+  def history(crag: Crag): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
     SQL(
       """
@@ -184,7 +192,7 @@ trait CragDao extends Repository[Crag] {
       """
     ).on(
       "name" -> crag.name
-    ).as(revisionedCrag *)
+    ).as(revisionedCrag *).right
   }
 
   private val crag = {

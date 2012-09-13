@@ -22,19 +22,19 @@ trait CrudApi {
   def createClimb(climb: Climb)             = climbDao.create(climb)
   def updateClimb(climb: Revisioned[Climb]) = climbDao.update(climb)
   def deleteClimb(climb: Revisioned[Climb]) = climbDao.delete(climb)
-  def getClimb(name: String)                = climbDao.get(name)
+  //def getClimb(name: String)                = climbDao.get(name)
 
   // These are here to check that the isolation level checking works.
   // This one should compile:
-  def runCreateClimbWorks(climb: Climb)(session: DbSession[TransactionSerializable]): Disjunction[ConcurrentAccess, Revisioned[Climb]] =
+  def runCreateClimbWorks(climb: Climb)(session: DbSession[TransactionSerializable]): Disjunction[ActionFailure, Revisioned[Climb]] =
     createClimb(climb).runInTransaction(session)
 
   // As should this one:
-  def runCreateClimbWorksToo(climb: Climb)(session: DbSession[TransactionRepeatableRead]): Disjunction[ConcurrentAccess, Revisioned[Climb]] =
+  def runCreateClimbWorksToo(climb: Climb)(session: DbSession[TransactionRepeatableRead]): Disjunction[ActionFailure, Revisioned[Climb]] =
     createClimb(climb).runInTransaction(session)
 
   // And when uncommented, this one shouldn't:
-  //def runCreateClimbShouldNotWork(climb: Climb)(session: DbSession[TransactionNone]): Disjunction[ConcurrentAccess, Revisioned[Climb]] =
+  //def runCreateClimbShouldNotWork(climb: Climb)(session: DbSession[TransactionNone]): Disjunction[ActionFailure, Revisioned[Climb]] =
   //  createClimb(climb).runInTransaction(session)
 
 
