@@ -14,5 +14,6 @@ trait Repository[M] {
   def create(m: M):             ActionResult[M, TransactionRepeatableRead]
   def update(m: Revisioned[M]): ActionResult[M, TransactionRepeatableRead]
   def delete(m: Revisioned[M]): ActionResult[M, TransactionRepeatableRead]
+  def purge (m: Revisioned[M]): ActionResult[M, TransactionRepeatableRead]
 
 }

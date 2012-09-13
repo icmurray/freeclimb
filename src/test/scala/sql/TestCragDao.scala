@@ -280,6 +280,110 @@ class CragDaoTest extends FunSpec
       }
 
     }
+
+    describe("the history action") {
+
+      it("should return an existing Crag's history of edits") {
+        // Create a Crag, and update it a few times.
+        val rev1 = run(cragDao.create(burbage)).toOption.get
+        val rev2 = run(cragDao.update(Revisioned[Crag](rev1.revision,
+                                                       Crag.makeUnsafe("burbage", "BURBAGE")))).toOption.get
+        val rev3 = run(cragDao.update(Revisioned[Crag](rev2.revision,
+                                                       Crag.makeUnsafe("burbage", "BURBAGE !!")))).toOption.get
+
+        val history = run(cragDao.history(burbage))
+        history.toList should equal (List(rev3, rev2, rev1))
+      }
+
+      it("should return the empty list for a Crag that does not exist") {
+        val history = run(cragDao.history(burbage))
+        history.toList should equal (Nil)
+      }
+
+      it("should return the empty list for a Crag that has been deleted") {
+        run(for {
+          val rev <- cragDao.create(burbage)
+          val _   <- cragDao.delete(rev)
+        } yield ())
+
+        val history = run(cragDao.history(burbage))
+
+        history.toList should equal (Nil)
+      }
+
+      it("should not return old history for a new Crag that overwrites a previous Crag") {
+        // Create and delete a Crag
+        val rev = run(for{
+          val rev <- cragDao.create(burbage)
+          val deleted <- cragDao.delete(rev)
+        } yield deleted)
+
+        // Create a new Crag with the same name
+        val newCrag = Crag.makeUnsafe("burbage", "BURBAGE")
+        val newRev = run(cragDao.create(newCrag)).toOption.get
+
+        val history = run(cragDao.history(burbage))
+
+        history.toList should equal (List(newRev))
+
+      }
+
+    }
+
+    describe("the purge action") {
+
+      it("should remove the Crag and it's history") {
+
+        val action = for {
+          val cragRev  <- cragDao.create(burbage)
+          val _ = cragRev.model should equal (burbage)
+          val _        <- cragDao.purge(cragRev)
+        } yield ()
+
+        run(action)
+        val someCrag = run(cragDao.get("burbage"))
+        someCrag should equal (None)
+
+      }
+
+      it("should be possible to create a new crag with the same name of a previsouly purged crag") {
+        val action = for {
+          val rev <- cragDao.create(burbage)
+          val _ <- cragDao.purge(rev)
+          val newRev <- cragDao.create(burbage)
+        } yield newRev
+
+        val newCrag = run(action)
+        newCrag fold (
+          error   => fail("Couldn't re-create purged crag"),
+          cragRev => {
+            cragRev.model should equal (burbage)
+          }
+        )
+      }
+      
+      it("should inform if the crag has been updated concurrently") {
+        val cragRev = run(cragDao.create(burbage)).toOption.get
+
+        val result = run(cragDao.purge(Revisioned[Crag](cragRev.revision-1, cragRev.model)))
+        result fold (
+          error       => {},
+          deletedCrag => fail("Purge should have failed")
+        )
+      }
+
+      it("should inform if the crag has been purged concurrently") {
+        val cragRev = run(cragDao.create(burbage)).toOption.get
+        val _ = run(cragDao.purge(cragRev))
+
+        val result = run(cragDao.purge(Revisioned[Crag](cragRev.revision, cragRev.model)))
+        result fold (
+          error       => {},
+          deletedCrag => fail("Delete should have failed")
+        )
+      }
+    }
+
   }
   
   private val burbage = Crag.makeUnsafe("burbage", "Burbage")

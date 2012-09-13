@@ -25,23 +25,20 @@ CREATE TABLE crag_history (
     -- mirror the "crags" table.
     -- remove most of the constraints as they may change on the "crags"
     -- table.
-    id serial PRIMARY KEY,
+    revision int PRIMARY KEY,
     name varchar(60) NOT NULL,
     title varchar(100) NOT NULL,
-    revision int NOT NULL CHECK (revision > 0),
 
     -- onto the history data
     crag_id int,    -- note that this does *not* reference crags.id
-    timestamp timestamp without time zone NOT NULL DEFAULT localtimestamp,
-
-    UNIQUE (crag_id, revision)
+    timestamp timestamp without time zone NOT NULL DEFAULT localtimestamp
 );
 
 -- Setup a trigger that records inserts and updates into "crag_history".
 CREATE FUNCTION record_crag() RETURNS TRIGGER AS $BODY$
 BEGIN
-    INSERT INTO crag_history (name, title, revision, crag_id)
-        VALUES (NEW.name, NEW.title, NEW.revision, NEW.id);
+    INSERT INTO crag_history (revision, name, title, crag_id)
+        VALUES (NEW.revision, NEW.name, NEW.title, NEW.id);
     RETURN NULL;
 END;
 $BODY$ LANGUAGE plpgsql;
