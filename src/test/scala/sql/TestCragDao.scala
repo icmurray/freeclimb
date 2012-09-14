@@ -48,19 +48,22 @@ class CragDaoTest extends FunSpec
       it("should return the latest revision of a crag that exists") {
 
         // Create a new Crag, and update it.
-        val newCrag = run(cragDao.create(burbage)).toOption.get
-        val update = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE"))
-        val updatedCrag = run(cragDao.update(update)).toOption.get
+        
+        val updatedCrag = run( for {
+          newCrag <- cragDao.create(burbage)
+          val update = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE"))
+          updatedCrag <- cragDao.update(update)
+        } yield updatedCrag) getOrElse fail("Unabled to create test fixture")
 
         // Get the Crag, and check the results
-        val latestCrag = run(cragDao.get("burbage")).toOption.get.get
+        val latestCrag = run(cragDao.get("burbage")) getOrElse fail("No crag found.")
         latestCrag.revision should equal (updatedCrag.revision)
         latestCrag.model should equal (updatedCrag.model)
       }
 
       it("should return None if the crag does not exist") {
-        val someCrag = run(cragDao.get("burbage")).toOption.get
-        someCrag should equal (None)
+        val someCrag = run(cragDao.get("burbage")).swap getOrElse ("Managed to find non-existant Crag!")
+        someCrag should equal (NotFound())
       }
 
     }
@@ -78,14 +81,9 @@ class CragDaoTest extends FunSpec
             revision.model should equal (burbage)
 
             // Check the Crag was stored in the database
-            val someStoredCrag = run(cragDao.get("burbage")).toOption.get
-            someStoredCrag match {
-              case None             => fail ("Failed to obtain stored Crag.")
-              case Some(storedCrag) => {
-                storedCrag.model should equal (burbage)
-                storedCrag.revision should equal (revision.revision)
-              }
-            }
+            val storedCrag = run(cragDao.get("burbage")) getOrElse fail("Failed to obtain stored Crag")
+            storedCrag.model should equal (burbage)
+            storedCrag.revision should equal (revision.revision)
           }
         )
       }
@@ -159,14 +157,9 @@ class CragDaoTest extends FunSpec
             revision.revision should be > (firstRevision.revision)
 
             // Check the update was stored in the database
-            val someStoredCrag = run(cragDao.get("burbage")).toOption.get
-            someStoredCrag match {
-              case None             => fail ("Failed to obtain stored Crag.")
-              case Some(storedCrag) => {
-                storedCrag.model should equal (updatedCrag)
-                storedCrag.revision should equal (revision.revision)
-              }
-            }
+            val storedCrag = run(cragDao.get("burbage")) getOrElse fail("Failed to obtain stored Crag")
+            storedCrag.model should equal (updatedCrag)
+            storedCrag.revision should equal (revision.revision)
           }
         )
       }
@@ -238,8 +231,8 @@ class CragDaoTest extends FunSpec
         } yield ()
 
         run(action)
-        val someCrag = run(cragDao.get("burbage")).toOption.get
-        someCrag should equal (None)
+        val someCrag = run(cragDao.get("burbage")).swap getOrElse fail("Found deleted Crag!")
+        someCrag should equal (NotFound())
       }
 
       it("should be possible to create a new crag with the same name of a previsouly deleted crag") {
@@ -340,8 +333,8 @@ class CragDaoTest extends FunSpec
         } yield ()
 
         run(action)
-        val someCrag = run(cragDao.get("burbage")).toOption.get
-        someCrag should equal (None)
+        val someCrag = run(cragDao.get("burbage")).swap getOrElse fail("Found purged Crag!")
+        someCrag should equal (NotFound())
 
       }
 

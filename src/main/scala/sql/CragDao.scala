@@ -60,9 +60,7 @@ trait CragDao extends Repository[Crag] {
       get(cragRev.model.name).runWith(session).fold (
         error => error.left,
         currentRevision => currentRevision match {
-
-          case None => EditConflict().left
-          case Some(latest) if latest.revision != cragRev.revision => EditConflict().left
+          case latest if latest.revision != cragRev.revision => EditConflict().left
           case _ =>
             val crag = cragRev.model
 
@@ -94,8 +92,7 @@ trait CragDao extends Repository[Crag] {
         error => error.left,
         currentRevision => currentRevision match {
 
-          case None => EditConflict().left
-          case Some(latest) if latest.revision != cragRev.revision => EditConflict().left
+          case latest if latest.revision != cragRev.revision => EditConflict().left
           case _ =>
             val cragId = SQL(
               """
@@ -137,8 +134,7 @@ trait CragDao extends Repository[Crag] {
       get(cragRev.model.name).runWith(session) fold (
         error => error.left,
         currentRevision => currentRevision match {
-          case None => EditConflict().left
-          case Some(latest) if latest.revision != cragRev.revision => EditConflict().left
+          case latest if latest.revision != cragRev.revision => EditConflict().left
           case _ =>
             val crag = cragRev.model
             val nextRevision: Long = SQL("SELECT nextval('crag_revision_seq');").as(scalar[Long].single)
@@ -168,17 +164,19 @@ trait CragDao extends Repository[Crag] {
 
   }
 
-  def get(name: String): ApiReadAction[Option[Revisioned[Crag]]] = ApiReadAction { session =>
+  def get(name: String): ApiReadAction[Revisioned[Crag]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
 
-    SQL(
+    val revOpt = SQL(
       """
       SELECT name, title, revision FROM crags
       WHERE name = {name}
       """
     ).on(
       "name" -> name
-    ).as(revisionedCrag.singleOpt).right
+    ).as(revisionedCrag.singleOpt)
+
+    toRight(revOpt)(NotFound())
   }
 
   def history(crag: Crag): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
