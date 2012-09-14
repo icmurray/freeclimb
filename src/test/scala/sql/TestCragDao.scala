@@ -48,21 +48,28 @@ class CragDaoTest extends FunSpec
       it("should return the latest revision of a crag that exists") {
 
         // Create a new Crag, and update it.
-        
-        val updatedCrag = run( for {
-          newCrag <- cragDao.create(burbage)
-          val update = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE"))
-          updatedCrag <- cragDao.update(update)
-        } yield updatedCrag) getOrElse fail("Unabled to create test fixture")
+        val updatedCrag = run {
+            for {
+              newCrag <- cragDao.create(burbage)
+              val update = Revisioned[Crag](newCrag.revision, newBurbage)
+              updatedCrag <- cragDao.update(update)
+            } yield updatedCrag
+        } getOrElse fail("Unabled to create test fixture")
 
         // Get the Crag, and check the results
-        val latestCrag = run(cragDao.get("burbage")) getOrElse fail("No crag found.")
+        val latestCrag = run {
+          cragDao.get("burbage")
+        } getOrElse fail("No crag found.")
+
         latestCrag.revision should equal (updatedCrag.revision)
         latestCrag.model should equal (updatedCrag.model)
       }
 
       it("should return None if the crag does not exist") {
-        val someCrag = run(cragDao.get("burbage")).swap getOrElse ("Managed to find non-existant Crag!")
+        val someCrag = run {
+          cragDao.get("burbage")
+        }.swap getOrElse ("Managed to find non-existant Crag!")
+
         someCrag should equal (NotFound())
       }
 
@@ -72,34 +79,32 @@ class CragDaoTest extends FunSpec
       
       it("should successfuly create a new crag") {
 
-        val result = run(cragDao.create(burbage))
+        val revision = run{
+          cragDao.create(burbage)
+        } getOrElse fail("Failed to create new Crag")
 
-        result.fold (
-          error => fail ("Failed to create new Crag: " + error.toString),
-          revision => {
-            // Check the returned Revisioned[Crag]
-            revision.model should equal (burbage)
+        // Check the returned Revisioned[Crag]
+        revision.model should equal (burbage)
 
-            // Check the Crag was stored in the database
-            val storedCrag = run(cragDao.get("burbage")) getOrElse fail("Failed to obtain stored Crag")
-            storedCrag.model should equal (burbage)
-            storedCrag.revision should equal (revision.revision)
-          }
-        )
+        // Check the Crag was stored in the database
+        val storedCrag = run {
+          cragDao.get("burbage")
+        } getOrElse fail("Failed to obtain stored Crag")
+
+        storedCrag.model should equal (burbage)
+        storedCrag.revision should equal (revision.revision)
       }
 
       it("should not create a crag if it already exists") {
 
         // Create the Crag initially.
-        run(cragDao.create(burbage))
+        run { cragDao.create(burbage) }
 
         // Now try to re-create it
-        val result = run(cragDao.create(burbage))
+        run {
+          cragDao.create(burbage)
+        }.swap getOrElse fail("Crag was re-created")
 
-        result.fold (
-          error => {},
-          revision => fail ("Crag was re-created")
-        )
       }
 
       it("should return a concurrent update if crags with the same name are created at the same time") {
@@ -121,7 +126,7 @@ class CragDaoTest extends FunSpec
 
         // The new Crag is created within a new Thread
         val f = future {
-          cragDao.create(burbage).runInTransaction(session2)
+          cragDao.create(newBurbage).runInTransaction(session2)
         }
 
         // *try* to ensure the second transaction has started concurrently
@@ -143,47 +148,50 @@ class CragDaoTest extends FunSpec
 
       it("should update an existing crag successfully") {
         // Create the Crag we're ging to update.
-        val firstRevision = run(cragDao.create(burbage)).toOption.get
+        val firstRevision = run {
+          cragDao.create(burbage)
+        } getOrElse fail("Could not create fixture")
 
-        val updatedCrag = Crag.makeUnsafe("burbage", "BURBAGE")
-        val rev: Revisioned[Crag] = Revisioned[Crag](firstRevision.revision, updatedCrag)
-        val result = run(cragDao.update(rev))
+        val rev = Revisioned[Crag](firstRevision.revision, newBurbage)
+        val revision = run {
+          cragDao.update(rev)
+        } getOrElse fail("Failed to update Crag")
 
-        result.fold (
-          error => fail ("Failed to update Crag: " + error.toString),
-          revision => {
-            // Check the returned Revisioned[Crag]
-            revision.model should equal (updatedCrag)
-            revision.revision should be > (firstRevision.revision)
+        // Check the returned Revisioned[Crag]
+        revision.model should equal (newBurbage)
+        revision.revision should be > (firstRevision.revision)
 
-            // Check the update was stored in the database
-            val storedCrag = run(cragDao.get("burbage")) getOrElse fail("Failed to obtain stored Crag")
-            storedCrag.model should equal (updatedCrag)
-            storedCrag.revision should equal (revision.revision)
-          }
-        )
+        // Check the update was stored in the database
+        val storedCrag = run {
+          cragDao.get("burbage")
+        } getOrElse fail("Failed to obtain stored Crag")
+
+        storedCrag.model should equal (newBurbage)
+        storedCrag.revision should equal (revision.revision)
       }
 
       it("should inform if the crag has been updated concurrently") {
 
         // First, create a Crag to update
-        val newCrag = run(cragDao.create(burbage)).toOption.get
+        val newCrag = run {
+          cragDao.create(burbage)
+        } getOrElse fail("Failed to create Crag")
 
         // Now, try to update it with a smaller revision number
-        val result = run(cragDao.update(Revisioned[Crag](newCrag.revision-1, newCrag.model)))
-        result fold (
-          error       => {},
-          updatedCrag => fail ("Update should have failed: " + updatedCrag)
-        )
+        val result = run {
+          cragDao.update(Revisioned[Crag](newCrag.revision-1, newBurbage))
+        }.swap getOrElse fail("Updated should have failed.")
       }
 
       it("should inform if the crag is being updated concurrently in an other transaction") {
 
         // Create a new Crag to work upon
-        val newCrag = run(cragDao.create(burbage)).toOption.get
+        val newCrag = run {
+          cragDao.create(burbage)
+        } getOrElse fail("Failed to create new Crag")
 
         // First, start a transaction that updates the new Crag, but don't complete it.
-        val update1 = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE"))
+        val update1 = Revisioned[Crag](newCrag.revision, newBurbage)
         val session1 = newSession()
         session1.dbConnection.setAutoCommit(false)
         session1.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
@@ -199,7 +207,7 @@ class CragDaoTest extends FunSpec
         session2.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
 
         // The new Crag is updated within a new Thread
-        val update2 = Revisioned[Crag](newCrag.revision, Crag.makeUnsafe("burbage", "BURBAGE BURBAGE"))
+        val update2 = Revisioned[Crag](newCrag.revision, newestBurbage)
         val f = future {
           cragDao.update(update2).runInTransaction(session2)
         }
@@ -224,52 +232,54 @@ class CragDaoTest extends FunSpec
 
       it("should delete an existing crag successfully") {
 
-        val action = for {
-          val cragRev  <- cragDao.create(burbage)
-          val _ = cragRev.model should equal (burbage)
-          val _        <- cragDao.delete(cragRev)
-        } yield ()
+        run {
+          for {
+            val cragRev  <- cragDao.create(burbage)
+            val _ = cragRev.model should equal (burbage)
+            val _        <- cragDao.delete(cragRev)
+          } yield ()
+        }
 
-        run(action)
-        val someCrag = run(cragDao.get("burbage")).swap getOrElse fail("Found deleted Crag!")
+        val someCrag = run {
+          cragDao.get("burbage")
+        }.swap getOrElse fail("Found deleted Crag!")
+
         someCrag should equal (NotFound())
       }
 
       it("should be possible to create a new crag with the same name of a previsouly deleted crag") {
-        val action = for {
-          val rev <- cragDao.create(burbage)
-          val _ <- cragDao.delete(rev)
-          val newRev <- cragDao.create(burbage)
-        } yield newRev
+        val newCrag = run {
+          for {
+            val rev <- cragDao.create(burbage)
+            val _ <- cragDao.delete(rev)
+            val newRev <- cragDao.create(burbage)
+          } yield newRev
+        } getOrElse fail ("Couldn't re-create deleted crag")
 
-        val newCrag = run(action)
-        newCrag fold (
-          error   => fail("Couldn't re-create deleted crag"),
-          cragRev => {
-            cragRev.model should equal (burbage)
-          }
-        )
+        newCrag.model should equal (burbage)
       }
 
       it("should inform if the crag has been updated concurrently") {
-        val cragRev = run(cragDao.create(burbage)).toOption.get
+        val cragRev = run {
+          cragDao.create(burbage)
+        } getOrElse fail("Could not create Crag")
 
-        val result = run(cragDao.delete(Revisioned[Crag](cragRev.revision-1, cragRev.model)))
-        result fold (
-          error       => {},
-          deletedCrag => fail("Delete should have failed")
-        )
+        val result = run {
+          cragDao.delete(Revisioned[Crag](cragRev.revision-1, newBurbage))
+        }.swap getOrElse fail("Delete should have failed")
       }
 
       it("should inform if the crag has been deleted concurrently") {
-        val cragRev = run(cragDao.create(burbage)).toOption.get
-        val _ = run(cragDao.delete(cragRev))
+        val cragRev = run {
+          for {
+            cragRev <- cragDao.create(burbage)
+            _       <- cragDao.delete(cragRev)
+          } yield cragRev
+        } getOrElse fail("Could not create new Crag")
 
-        val result = run(cragDao.delete(Revisioned[Crag](cragRev.revision, cragRev.model)))
-        result fold (
-          error       => {},
-          deletedCrag => fail("Delete should have failed")
-        )
+        run {
+          cragDao.delete(cragRev)
+        }.swap getOrElse fail("Delete should have failed")
       }
 
     }
@@ -277,44 +287,63 @@ class CragDaoTest extends FunSpec
     describe("the history action") {
 
       it("should return an existing Crag's history of edits") {
-        // Create a Crag, and update it a few times.
-        val rev1 = run(cragDao.create(burbage)).toOption.get
-        val rev2 = run(cragDao.update(Revisioned[Crag](rev1.revision,
-                                                       Crag.makeUnsafe("burbage", "BURBAGE")))).toOption.get
-        val rev3 = run(cragDao.update(Revisioned[Crag](rev2.revision,
-                                                       Crag.makeUnsafe("burbage", "BURBAGE !!")))).toOption.get
 
-        val history = run(cragDao.history(burbage)).toOption.get
+        // Create a Crag, and update it a few times.
+        val (rev1, rev2, rev3) = run {
+          for {
+            rev1 <- cragDao.create(burbage)
+            rev2 <- cragDao.update(Revisioned[Crag](rev1.revision, newBurbage))
+            rev3 <- cragDao.update(Revisioned[Crag](rev2.revision, newestBurbage))
+          } yield (rev1, rev2, rev3)
+        } getOrElse fail("Couldn't create fixture Crag")
+
+        val history = run {
+          cragDao.history(burbage)
+        } getOrElse fail("Couldn't retrieve history")
+
         history.toList should equal (List(rev3, rev2, rev1))
       }
 
       it("should return the empty list for a Crag that does not exist") {
-        val history = run(cragDao.history(burbage)).toOption.get
+        val history = run {
+          cragDao.history(burbage)
+        } getOrElse fail("Couldn't retrieve history")
+
         history.toList should equal (Nil)
       }
 
       it("should return the empty list for a Crag that has been deleted") {
-        run(for {
-          val rev <- cragDao.create(burbage)
-          val _   <- cragDao.delete(rev)
-        } yield ())
+        run {
+          for {
+            val rev <- cragDao.create(burbage)
+            val _   <- cragDao.delete(rev)
+          } yield ()
+        }
 
-        val history = run(cragDao.history(burbage)).toOption.get
+        val history = run {
+          cragDao.history(burbage)
+        } getOrElse fail("Couldn't retrieve history")
+        
         history.toList should equal (Nil)
       }
 
       it("should not return old history for a new Crag that overwrites a previous Crag") {
         // Create and delete a Crag
-        val rev = run(for{
-          val rev <- cragDao.create(burbage)
-          val deleted <- cragDao.delete(rev)
-        } yield deleted)
+        val rev = run {
+          for {
+            val rev <- cragDao.create(burbage)
+            val deleted <- cragDao.delete(rev)
+          } yield deleted
+        }
 
         // Create a new Crag with the same name
-        val newCrag = Crag.makeUnsafe("burbage", "BURBAGE")
-        val newRev = run(cragDao.create(newCrag)).toOption.get
+        val newRev = run {
+          cragDao.create(newBurbage)
+        } getOrElse fail("Couldn't create Crag")
 
-        val history = run(cragDao.history(burbage)).toOption.get
+        val history = run {
+          cragDao.history(burbage)
+        } getOrElse fail("Couldn't retrieve history")
 
         history.toList should equal (List(newRev))
 
@@ -326,57 +355,61 @@ class CragDaoTest extends FunSpec
 
       it("should remove the Crag and it's history") {
 
-        val action = for {
-          val cragRev  <- cragDao.create(burbage)
-          val _ = cragRev.model should equal (burbage)
-          val _        <- cragDao.purge(cragRev)
-        } yield ()
+        run {
+          for {
+            val cragRev  <- cragDao.create(burbage)
+            val _ = cragRev.model should equal (burbage)
+            val _        <- cragDao.purge(cragRev)
+          } yield ()
+        }
 
-        run(action)
-        val someCrag = run(cragDao.get("burbage")).swap getOrElse fail("Found purged Crag!")
+        val someCrag = run {
+          cragDao.get("burbage")
+        }.swap getOrElse fail("Found purged Crag!")
+        
         someCrag should equal (NotFound())
 
       }
 
       it("should be possible to create a new crag with the same name of a previsouly purged crag") {
-        val action = for {
-          val rev <- cragDao.create(burbage)
-          val _ <- cragDao.purge(rev)
-          val newRev <- cragDao.create(burbage)
-        } yield newRev
+        val newCrag = run {
+          for {
+            val rev <- cragDao.create(burbage)
+            val _ <- cragDao.purge(rev)
+            val newRev <- cragDao.create(burbage)
+          } yield newRev
+        } getOrElse fail("Couldn't re-create purged crag")
 
-        val newCrag = run(action)
-        newCrag fold (
-          error   => fail("Couldn't re-create purged crag"),
-          cragRev => {
-            cragRev.model should equal (burbage)
-          }
-        )
+        newCrag.model should equal (burbage)
       }
       
       it("should inform if the crag has been updated concurrently") {
-        val cragRev = run(cragDao.create(burbage)).toOption.get
+        val cragRev = run {
+          cragDao.create(burbage)
+        } getOrElse fail("Failed to create Crag")
 
-        val result = run(cragDao.purge(Revisioned[Crag](cragRev.revision-1, cragRev.model)))
-        result fold (
-          error       => {},
-          deletedCrag => fail("Purge should have failed")
-        )
+        val result = run {
+          cragDao.purge(Revisioned[Crag](cragRev.revision-1, cragRev.model))
+        }.swap getOrElse fail("Purge should have failed")
       }
 
       it("should inform if the crag has been purged concurrently") {
-        val cragRev = run(cragDao.create(burbage)).toOption.get
-        val _ = run(cragDao.purge(cragRev))
+        val cragRev = run {
+          for {
+            cragRev <- cragDao.create(burbage)
+            _       <- cragDao.purge(cragRev)
+          } yield cragRev
+        } getOrElse fail("Failed to create and purge Crag")
 
-        val result = run(cragDao.purge(Revisioned[Crag](cragRev.revision, cragRev.model)))
-        result fold (
-          error       => {},
-          deletedCrag => fail("Delete should have failed")
-        )
+        val result = run {
+          cragDao.purge(Revisioned[Crag](cragRev.revision, cragRev.model))
+        }.swap getOrElse fail("Delete should have failed")
       }
     }
 
   }
   
   private val burbage = Crag.makeUnsafe("burbage", "Burbage")
+  private val newBurbage = Crag.makeUnsafe("burbage", "BURBAGE")
+  private val newestBurbage = Crag.makeUnsafe("burbage", "BURBAGE BURBAGE")
 }
