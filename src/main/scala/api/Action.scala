@@ -14,13 +14,17 @@ case class ActionT[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
   def runWith(s: DbSession[I]) = apply(s)
 
   /** Run the action in a transaction. */
-   def runInTransaction(s: DbSession[I]) = {
+   def runInTransaction(s: DbSession[I])(implicit F: Failable[M[_]]) = {
     val connection = s.dbConnection
     try{
       connection.setAutoCommit(false)
       connection.setTransactionIsolation(s.jdbcLevel)
       val result = g(s)
-      connection.commit()
+      if (F.isFailure(result)) {
+        connection.rollback()
+      } else {
+        connection.commit()
+      }
       result
     } catch {
       case e => connection.rollback() ; throw e
@@ -38,6 +42,19 @@ case class ActionT[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
     M.bind(g(s))(f(_)(s))
   }
 
+}
+
+trait Failable[T] {
+  def isFailure(t: T): Boolean
+}
+
+object Failable {
+  implicit def disjunctionAsFailable: Failable[\/[_,_]] = new Failable[\/[_,_]] {
+    override def isFailure(d: \/[_,_]) = d.isLeft
+  }
+  implicit val possibleActionFailureAsFailable: Failable[PossibleActionFailure[_]] = new Failable[PossibleActionFailure[_]] {
+    override def isFailure(d: PossibleActionFailure[_]) = d.isLeft
+  }
 }
 
 /**

@@ -44,10 +44,10 @@ trait CragDao extends Repository[Crag] {
 
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(UniqueViolation) => connection.rollback() ; EditConflict().left
-        case _                     => connection.rollback() ; throw e
+        case Some(UniqueViolation) => EditConflict().left
+        case _                     => throw e
       }
-      case e => connection.rollback() ; throw e
+      case e => throw e
     }
 
   }
@@ -76,10 +76,10 @@ trait CragDao extends Repository[Crag] {
       )
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) => connection.rollback() ; EditConflict().left
-        case _                          => connection.rollback() ; throw e
+        case Some(SerializationFailure) =>  EditConflict().left
+        case _                          =>  throw e
       }
-      case e                            => connection.rollback() ; throw e
+      case e                            =>  throw e
     }
   }
 
@@ -120,10 +120,10 @@ trait CragDao extends Repository[Crag] {
       )
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) => connection.rollback() ; EditConflict().left
-        case _                          => connection.rollback() ; throw e
+        case Some(SerializationFailure) =>  EditConflict().left
+        case _                          =>  throw e
       }
-      case e                            => connection.rollback() ; throw e
+      case e                            =>  throw e
     }
   }
 
@@ -156,10 +156,10 @@ trait CragDao extends Repository[Crag] {
       )
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) => connection.rollback() ; EditConflict().left
-        case _                          => connection.rollback() ; throw e
+        case Some(SerializationFailure) =>  EditConflict().left
+        case _                          =>  throw e
       }
-      case e                            => connection.rollback() ; throw e
+      case e                            =>  throw e
     }
 
   }
