@@ -199,6 +199,19 @@ trait CragDao extends Repository[Crag] {
     ).as(revisionedCrag *).right
   }
 
+  def deletedList(): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
+    implicit val connection = session.dbConnection
+    SQL(
+      """
+      SELECT DISTINCT ON (h.crag_id)
+             h.name, h.title, h.revision FROM crag_history as h
+        LEFT OUTER JOIN crags AS c ON c.id = h.crag_id
+        WHERE c.id IS NULL
+        ORDER BY h.crag_id, h.revision DESC
+      """
+    ).as(revisionedCrag *).right
+  }
+
   private val crag = {
     str("name") ~
     str("title") map {

@@ -268,31 +268,43 @@ class CragDaoTest extends FunSpec
 
       it("should delete an existing crag successfully") {
 
-        run {
+        val rev = run {
           for {
             val cragRev  <- cragDao.create(burbage)
             val _ = cragRev.model should equal (burbage)
             val _        <- cragDao.delete(cragRev)
-          } yield ()
-        }
+          } yield cragRev
+        } getOrElse fail("Failed to create test Crag")
 
         val someCrag = run {
           cragDao.get("burbage")
         }.swap getOrElse fail("Found deleted Crag!")
 
         someCrag should equal (NotFound())
+        
+        val deletedCrags = run {
+          cragDao.deletedList()
+        } getOrElse fail("Couldn't retrieve deleted Crags")
+
+        deletedCrags.toList should contain (rev)
       }
 
       it("should be possible to create a new crag with the same name of a previsouly deleted crag") {
-        val newCrag = run {
+        val (origRev, newCrag) = run {
           for {
             val rev <- cragDao.create(burbage)
             val _ <- cragDao.delete(rev)
             val newRev <- cragDao.create(burbage)
-          } yield newRev
+          } yield (rev, newRev)
         } getOrElse fail ("Couldn't re-create deleted crag")
 
         newCrag.model should equal (burbage)
+
+        val deletedCrags = run {
+          cragDao.deletedList()
+        } getOrElse fail("Couldn't retrieve deleted Crags")
+
+        deletedCrags.toList should contain (origRev)
       }
 
       it("should inform if the crag has been updated concurrently") {
@@ -338,6 +350,7 @@ class CragDaoTest extends FunSpec
         } getOrElse fail("Couldn't retrieve history")
 
         history.toList should equal (List(rev3, rev2, rev1))
+
       }
 
       it("should return the empty list for a Crag that does not exist") {
@@ -387,6 +400,45 @@ class CragDaoTest extends FunSpec
 
     }
 
+    describe("the deletedList action") {
+      it("should be empty if Crags have not been deleted") {
+        // Create a Crag, and update it.  But don't delete it.
+        run {
+          for {
+            rev <- cragDao.create(burbage)
+            _   <- cragDao.update(Revisioned[Crag](rev.revision, newBurbage))
+          } yield ()
+        } getOrElse fail("Error setting up fixture")
+
+        // Check deleted list is empty
+        val deletedList = run {
+          cragDao.deletedList()
+        } getOrElse fail("Error retrieving deleted list")
+
+        deletedList.toList should equal (Nil)
+
+      }
+      
+      it("should contain only the latest revision of a deleted Crag") {
+        // Create a Crag, and update it, then delete it.
+        val (rev1, rev2) = run {
+          for {
+            rev1 <- cragDao.create(burbage)
+            rev2 <- cragDao.update(Revisioned[Crag](rev1.revision, newBurbage))
+            _    <- cragDao.delete(rev2)
+          } yield (rev1, rev2)
+        } getOrElse fail ("Error setting up fixture")
+
+        // Check deleted list is empty
+        val deletedList = run {
+          cragDao.deletedList()
+        } getOrElse fail("Error retrieving deleted list")
+
+        deletedList.toList should contain (rev2)
+        deletedList.toList should not contain (rev1)
+      }
+    }
+
     describe("the purge action") {
 
       it("should remove the Crag and it's history") {
@@ -405,6 +457,11 @@ class CragDaoTest extends FunSpec
         
         someCrag should equal (NotFound())
 
+        val deletedCrags = run {
+          cragDao.deletedList()
+        } getOrElse fail("Failed to retrieve deleted Crags")
+
+        deletedCrags should equal (Nil)
       }
 
       it("should be possible to create a new crag with the same name of a previsouly purged crag") {
