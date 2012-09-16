@@ -164,19 +164,25 @@ trait CragDao extends Repository[Crag] {
 
   }
 
-  def get(name: String): ApiReadAction[Revisioned[Crag]] = ApiReadAction { session =>
+  def get(name: String): ApiReadAction[Revisioned[Crag]] = for {
+    optionRev <- getOption(name)
+    result <- optionRev match {
+      case None      => ApiReadAction.pure(NotFound().left)
+      case Some(rev) => ApiReadAction.pure(rev.right)
+    }
+  } yield result
+
+  def getOption(name: String): ApiReadAction[Option[Revisioned[Crag]]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
 
-    val revOpt = SQL(
+    SQL(
       """
       SELECT name, title, revision FROM crags
       WHERE name = {name}
       """
     ).on(
       "name" -> name
-    ).as(revisionedCrag.singleOpt)
-
-    toRight(revOpt)(NotFound())
+    ).as(revisionedCrag.singleOpt).right
   }
 
   def history(crag: Crag): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>

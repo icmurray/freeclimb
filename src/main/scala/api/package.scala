@@ -30,5 +30,7 @@ package object api {
 
   object ApiReadAction {
     def apply[A](a: DbSession[TransactionReadCommitted] => \/[ActionFailure, A]) = ActionT[PossibleActionFailure,A,TransactionReadCommitted](a)
+
+    def pure[A](v: => \/[ActionFailure, A]) = ApiReadAction(s => v)
   }
 }

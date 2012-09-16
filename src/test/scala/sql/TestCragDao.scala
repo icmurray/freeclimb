@@ -65,16 +65,52 @@ class CragDaoTest extends FunSpec
         latestCrag.model should equal (updatedCrag.model)
       }
 
-      it("should return None if the crag does not exist") {
+      it("should return NotFound if the crag does not exist") {
         val someCrag = run {
           cragDao.get("burbage")
-        }.swap getOrElse ("Managed to find non-existant Crag!")
+        }.swap getOrElse fail("Managed to find non-existant Crag!")
 
         someCrag should equal (NotFound())
       }
 
     }
 
+    describe("The getOption action") {
+
+      it("should return the latest revision of a crag that exists") {
+
+        // Create a new Crag, and update it.
+        val updatedCrag = run {
+            for {
+              newCrag <- cragDao.create(burbage)
+              val update = Revisioned[Crag](newCrag.revision, newBurbage)
+              updatedCrag <- cragDao.update(update)
+            } yield updatedCrag
+        } getOrElse fail("Unabled to create test fixture")
+
+        // Get the Crag, and check the results
+        val latestCrag = run {
+          cragDao.getOption("burbage")
+        } getOrElse fail("Error finding Crag")
+
+        latestCrag match {
+          case None             => fail("No crag found")
+          case Some(latestCrag) => {
+            latestCrag.revision should equal (updatedCrag.revision)
+            latestCrag.model should equal (updatedCrag.model)
+          }
+        }
+      }
+
+      it("should return None if the crag does not exist") {
+        val someCrag = run {
+          cragDao.getOption("burbage")
+        } getOrElse fail("Error finding Crag")
+
+        someCrag should equal (None)
+      }
+
+    }
     describe("The create action") {
       
       it("should successfuly create a new crag") {
