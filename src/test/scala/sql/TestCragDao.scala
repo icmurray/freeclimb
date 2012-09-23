@@ -262,6 +262,41 @@ class CragDaoTest extends FunSpec
         )
       }
 
+      it("should not record updates that don't change anything") {
+        // Create the Crag we're ging to update.
+        val firstRevision = run {
+          cragDao.create(burbage)
+        } getOrElse fail("Could not create fixture")
+
+        val rev = Revisioned[Crag](firstRevision.revision, burbage)
+        val revision = run {
+          cragDao.update(rev)
+        } getOrElse fail("Failed to update Crag")
+
+        // Check the returned Revisioned[Crag]
+        revision.model should equal (burbage)
+        revision.revision should be > (firstRevision.revision)
+
+        // Check the update was stored in the database
+        val storedCrag = run {
+          cragDao.get("burbage")
+        } getOrElse fail("Failed to obtain stored Crag")
+
+        storedCrag.model should equal (burbage)
+        storedCrag.revision should equal (revision.revision)
+
+        // Check the history contains only one entry, but with
+        // the latest revision.
+        val history = run {
+          cragDao.history(burbage)
+        } getOrElse fail("Failed to get history")
+
+        history.toList.length should equal (1)
+        history.toList.head.model should equal (burbage)
+        history.toList.head.revision should equal (revision.revision)
+        
+      }
+
     }
 
     describe("The delete action") {
