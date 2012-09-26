@@ -14,18 +14,34 @@ CREATE TYPE GradingSystem as ENUM (
     'Font'                  -- F7a, F7a+, ...
 );
 
--- A Grade is a composite type.  A Grade belongs to a particular grading
--- system, and grades within a grading system are ranked linearly accoding to
--- their difficulty.  There's no database code to map the difficulty ranking of
--- a grade to it's grade name.  This mapping is encoding in application code.
---
--- This is perhaps a non-standard approach, but it does allow indexing of the
--- climbs table on the grade column.  Compared to a separate "grades" table
--- reference from the climbs table, this should allow more efficient lookup of
--- climbs based on a grade range of a given GradingSystem.  Which will probably
--- be a fairly common request.
-CREATE TYPE Grade AS (
-    system GradingSystem,
-    difficulty int
+CREATE TABLE grades (
+    id serial PRIMARY KEY,
+    grading_system GradingSystem NOT NULL,
+    difficulty int NOT NULL,
+
+    UNIQUE (grading_system, difficulty)
 );
+
+CREATE INDEX grades_difficulty ON grades ( grading_system, difficulty );
+
+DO LANGUAGE plpgsql $$
+BEGIN
+
+    FOR i IN 1..33 LOOP
+        INSERT INTO grades (grading_system, difficulty) VALUES ('EuSport', i);
+    END LOOP;
+
+    FOR i IN 1..18 LOOP
+        INSERT INTO grades (grading_system, difficulty) VALUES ('UkTechnical', i);
+    END LOOP;
+
+    FOR i IN 1..27 LOOP
+        INSERT INTO grades (grading_system, difficulty) VALUES ('UkAdjective', i);
+    END LOOP;
+
+    FOR i IN 1..486 LOOP
+        INSERT INTO grades (grading_system, difficulty) VALUES ('UkTrad', i);
+    END LOOP;
+END
+$$;
 

@@ -9,14 +9,10 @@ CREATE TABLE climbs (
     crag_id int NOT NULL REFERENCES crags(id),
     revision int NOT NULL CHECK (revision > 0) DEFAULT nextval('revision_seq'),
 
-    grade Grade NOT NULL,
-    alternative_grades Grade[] NOT NULL DEFAULT '{}',
+    grade_id int NOT NULL REFERENCES grades(id),
 
     UNIQUE (name, crag_id)
 );
-
--- An index on the grade of climbs.
-CREATE INDEX climbs_grade ON climbs (  ((grade).system) , ((grade).difficulty)  );
 
 -- Mirror of the climb table, with a few extra columns thrown in.
 -- Note that climb does not reference climbs.  This is because we want to
@@ -32,8 +28,7 @@ CREATE TABLE climb_history (
     title varchar(100) NOT NULL,
     description text NOT NULL,
     crag_id int NOT NULL,
-    grade Grade NOT NULL,
-    alternative_grades Grade[] NOT NULL,
+    grade_id int NOT NULL,
 
     -- onto the history data
     climb_id int,    -- note that this does *not* reference climbs.id
@@ -50,16 +45,14 @@ BEGIN
                                title,
                                description,
                                crag_id,
-                               grade,
-                               alternative_grades,
+                               grade_id,
                                climb_id)
         VALUES (NEW.revision,
                 NEW.name,
                 NEW.title,
                 NEW.description,
                 NEW.crag_id,
-                NEW.grade,
-                NEW.alternative_grades,
+                NEW.grade_id,
                 NEW.id);
 
     -- Bump the referenced crag's revision
