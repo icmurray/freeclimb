@@ -23,24 +23,21 @@ import Scalaz._
  * @param grade is the Grade of the Climb.  This includes information about
  *        the *type* of grade.
  *
- * @param tags is a set of Tags associated with this Climb
  */
 class Climb private (
     val name: String,
     val title: String,
     val description: String,
     val crag: Crag,
-    val grade: Grade,
-    val tags: Set[Tag]) {
+    val grade: Grade) {
 
   override val hashCode = {
     name.hashCode + 41 * (
     title.hashCode + 41 * (
     description.hashCode + 41 * (
     crag.hashCode + 41 * (
-    grade.hashCode + 41 * (
-    tags.hashCode
-    )))))
+    grade.hashCode
+    ))))
   }
 
   override def equals(that: Any) = that match {
@@ -49,8 +46,7 @@ class Climb private (
       c.asInstanceOf[Climb].title       == this.title       &&
       c.asInstanceOf[Climb].description == this.description &&
       c.asInstanceOf[Climb].crag        == this.crag        &&
-      c.asInstanceOf[Climb].grade       == this.grade       &&
-      c.asInstanceOf[Climb].tags        == this.tags
+      c.asInstanceOf[Climb].grade       == this.grade
     }
     case _        => false
   }
@@ -86,23 +82,21 @@ object Climb {
             title: String,
             description: String,
             crag: Crag,
-            grade: Grade,
-            tags: Set[Tag]) = (
+            grade: Grade) = (
 
     validateName(name)               .enrichAs("name")        |@|
     validateTitle(title)             .enrichAs("title")       |@|
     validateDescription(description) .enrichAs("description")
 
-  ) { case _ => new Climb ( name, title, description, crag, grade, tags): Climb }.disjunction
+  ) { case _ => new Climb ( name, title, description, crag, grade): Climb }.disjunction
 
-  def makeClimbUnsafe(
+  def makeUnsafe(
       name: String,
       title: String,
       description: String,
       crag: Crag,
-      grade: Grade,
-      tags: Set[Tag]) = {
-    Climb(name, title, description, crag, grade, tags).fold (
+      grade: Grade) = {
+    Climb(name, title, description, crag, grade).fold (
       error => throw new RuntimeException("Invalid Climb: "+name),
       climb => climb
     )
