@@ -93,8 +93,9 @@ trait ClimbDao extends Repository[Climb] {
       Revisioned[Climb](nextRevision, climb).right
     } catch {
       case e: SQLException => e.sqlError match {
-        case Some(UniqueViolation) => EditConflict().left
-        case _                     => throw e
+        case Some(UniqueViolation)  => EditConflict().left
+        case Some(NotNullViolation) => ValidationError().left
+        case _                      => throw e
       }
       case e => throw e
     }

@@ -365,6 +365,8 @@ class CragDaoTest extends FunSpec
         }.swap getOrElse fail("Delete should have failed")
       }
 
+      it("should fail if the crag has climbs associated with it") (pending)
+
     }
 
     describe("the history action") {
@@ -533,6 +535,8 @@ class CragDaoTest extends FunSpec
           cragDao.purge(Revisioned[Crag](cragRev.revision, cragRev.model))
         }.swap getOrElse fail("Delete should have failed")
       }
+      
+      it("should fail if the crag has climbs associated with it") (pending)
     }
 
   }

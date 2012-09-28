@@ -7,6 +7,7 @@ package freeclimb.api
 
 sealed trait ActionFailure
 
+final case class ValidationError extends ActionFailure
 final case class EditConflict extends ActionFailure
 final case class NotFound extends ActionFailure
 final case class NotImplemented extends ActionFailure

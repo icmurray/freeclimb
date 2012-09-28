@@ -169,7 +169,96 @@ class ClimbDaoTest extends FunSpec
         } getOrElse fail("No climb found")
 
       }
+      
+      it("should not create a climb if it already exists") {
 
+        run {
+          CragDao.create(burbage)
+        } getOrElse fail("Failed to create fixture crag")
+
+        // Create the Crag initially.
+        run { climbDao.create(harvest) } getOrElse fail ("Failed to create fixture")
+
+        // Now try to re-create it
+        run {
+          climbDao.create(harvest)
+        }.swap getOrElse fail("Climb was re-created")
+
+      }
+
+      it("should not create a climb if the crag does not exist") {
+        val error = run {
+          climbDao.create(harvest)
+        }.swap getOrElse fail("Managed to create a climb without a crag!")
+
+        error should equal (ValidationError())
+      }
+
+      it("should be possible to have two climbs with the same name on different crags") {
+        run {
+          for {
+            b <- CragDao.create(burbage)
+            s <- CragDao.create(stanage)
+          } yield ()
+        } getOrElse fail("Unable to create fixture crags")
+
+        run { climbDao.create(harvest) } getOrElse fail("Unable to create fixture climb")
+
+        run {
+          climbDao.create(newerHarvest)
+        } getOrElse fail("Couldn't create climb with same name on different crag")
+
+      }
+
+      it("should bump the revision number of the crag that the climb is created against") {
+        val originalCragRev = run {
+          CragDao.create(burbage)
+        } getOrElse fail("Failed to create crag fixture")
+
+        run {
+          climbDao.create(harvest)
+        } getOrElse fail("Couldn't create climb fixture")
+
+        val newCragRev = run { CragDao.get("burbage") } getOrElse fail("Failed to retrieve crag")
+
+        newCragRev.revision should be > (originalCragRev.revision)
+      }
+
+      it("should return a concurrent update if climbs with the same name are created at the same time") (pending)
+    }
+
+    describe("The update action") {
+      it("should update an existing climb successfully") (pending)
+      it("should inform if the climb has been updated concurrently") (pending)
+      it("should inform if the crag is being updated concurrently in an other transaction") (pending)
+      it("should bump the Crag's revision number when updating the Climb") (pending)
+    }
+
+    describe("The delete action") {
+      it("should delete an existing climb successfully") (pending)
+      it("should be possible to create a new climb with the same name of previously deleted climb") (pending)
+      it("should inform if the climb has been updated concurrently") (pending)
+      it("should inform if the climb has been deleted concurrently") (pending)
+      it("should bump the revision number of the Crag that the climb belonged to") (pending)
+    }
+
+    describe("The history action") {
+      it("should return an existing climb's history of edits") (pending)
+      it("should return the empty list for a climb that doesn't exist") (pending)
+      it("should return the empty list for a climb that has been deleted") (pending)
+      it("should not return the old history for a new climb that overwrites an old climb") (pending)
+    }
+
+    describe("The deleted list action") {
+      it("should be empty if no climbs have been deleted") (pending)
+      it("should contain only the latest revision of a deleted climb") (pending)
+    }
+
+    describe("The purge action") {
+      it("should remove the climb and its history") (pending)
+      it("should be possible to create a new climb with the same name as a previsously purged climb") (pending)
+      it("should inform if the climb has been updated concurrently") (pending)
+      it("should inform if the climb has been purged concurrently") (pending)
     }
 
   }

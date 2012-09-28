@@ -3,7 +3,7 @@
 -- The simplest of climb tables.
 CREATE TABLE climbs (
     id serial PRIMARY KEY,
-    name varchar(60) NOT NULL UNIQUE CHECK (name <> ''),
+    name varchar(60) NOT NULL,
     title varchar(100) NOT NULL CHECK (title <> ''),
     description text NOT NULL,
     crag_id int NOT NULL REFERENCES crags(id),
@@ -58,6 +58,9 @@ BEGIN
     -- Bump the referenced crag's revision
     UPDATE crags SET
         revision = NEW.revision
+
+    -- TODO: also bump the old crag in case of deletion.
+
     WHERE id = NEW.crag_id;
 
     RETURN NULL;
