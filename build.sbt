@@ -4,6 +4,10 @@ version := "0.1"
 
 scalaVersion := "2.9.2"
 
+// TODO: separate out integration tests to run sequentially
+//       allowing unit tests to be run in parallel
+parallelExecution in Test := false
+
 // The Typesafe repository 
 resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/"
 
