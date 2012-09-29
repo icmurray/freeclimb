@@ -149,8 +149,37 @@ trait ClimbDao extends Repository[Climb] {
 
   }
 
-  override def delete(climb: Revisioned[Climb]) = ApiAction { session =>
-    NotImplemented().left
+  override def delete(climbRev: Revisioned[Climb]) = ApiAction { session =>
+    implicit val connection = session.dbConnection
+    try {
+
+      get(climbRev.model.crag.name, climbRev.model.name).runWith(session).fold (
+        error => error.left,
+        currentRevision => currentRevision match {
+          case latest if latest.revision != climbRev.revision => EditConflict().left
+          case _ =>
+            val climb = climbRev.model
+
+            SQL(
+              """
+              DELETE from climbs
+                WHERE name = {name}
+                  AND crag_id = (SELECT id FROM crags WHERE name = {crag_name})
+              """
+            ).on(
+              "name"      -> climb.name,
+              "crag_name" -> climb.crag.name
+            ).execute()
+            climbRev.right
+        }
+      )
+    } catch {
+      case e: SQLException => e.sqlError match {
+        case Some(SerializationFailure) =>  EditConflict().left
+        case _                          =>  throw e
+      }
+      case e                            =>  throw e
+    }
   }
 
   override def purge(climb: Revisioned[Climb]) = ApiAction { session =>

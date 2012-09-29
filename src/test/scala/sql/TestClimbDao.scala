@@ -273,11 +273,73 @@ class ClimbDaoTest extends FunSpec
     }
 
     describe("The delete action") {
-      it("should delete an existing climb successfully") (pending)
-      it("should be possible to create a new climb with the same name of previously deleted climb") (pending)
-      it("should inform if the climb has been updated concurrently") (pending)
-      it("should inform if the climb has been deleted concurrently") (pending)
-      it("should bump the revision number of the Crag that the climb belonged to") (pending)
+      it("should delete an existing climb successfully") {
+        val result = run {
+          for {
+            _      <- CragDao.create(burbage)
+            rev    <- climbDao.create(harvest)
+            _      <- climbDao.delete(rev)
+            result <- climbDao.getOption("burbage", "harvest")
+          } yield result
+        } getOrElse fail("Failed to delete climb")
+
+        result should equal (None)
+      }
+
+      it("should be possible to create a new climb with the same name of previously deleted climb") {
+        val (first, second) = run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+            _   <- climbDao.delete(rev)
+            result <- climbDao.create(newHarvest)
+          } yield (rev, result)
+        } getOrElse fail("Failed to re-create climb")
+
+        first.revision should be < second.revision
+        second.model should equal (newHarvest)
+      }
+
+      it("should inform if the climb has been updated concurrently") {
+        val climbRev = run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+          } yield rev
+        } getOrElse fail("Failed to create Climb")
+
+        val result = run {
+          climbDao.delete(Revisioned[Climb](climbRev.revision-1, climbRev.model))
+        }.swap getOrElse fail("Purge should have failed")
+      }
+
+      it("should inform if the climb has been deleted concurrently") {
+        val climbRev = run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+            _   <- climbDao.delete(rev)
+          } yield rev
+        } getOrElse fail("Failed to create Climb")
+
+        val result = run {
+          climbDao.delete(climbRev)
+        }.swap getOrElse fail("Purge should have failed")
+      }
+
+      it("should bump the revision number of the Crag that the climb belonged to") {
+        val (first, second) = run {
+          for {
+            _      <- CragDao.create(burbage)
+            climb  <- climbDao.create(harvest)
+            first  <- CragDao.get("burbage")
+            _      <- climbDao.delete(climb)
+            second <- CragDao.get("burbage")
+          } yield (first, second)
+        } getOrElse fail("Failed to setup fixtures")
+
+        first.revision should be < (second.revision)
+      }
     }
 
     describe("The history action") {

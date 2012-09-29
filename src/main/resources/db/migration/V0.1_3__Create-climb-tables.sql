@@ -55,14 +55,6 @@ BEGIN
                 NEW.grade_id,
                 NEW.id);
 
-    -- Bump the referenced crag's revision
-    UPDATE crags SET
-        revision = NEW.revision
-
-    -- TODO: also bump the old crag in case of deletion.
-
-    WHERE id = NEW.crag_id;
-
     RETURN NULL;
 END;
 $BODY$ LANGUAGE plpgsql;
@@ -70,3 +62,24 @@ $BODY$ LANGUAGE plpgsql;
 CREATE TRIGGER on_climb_insert_or_update
     AFTER INSERT OR UPDATE ON climbs
     FOR EACH ROW EXECUTE PROCEDURE record_climb();
+
+-- Setup a trigger that bumps the revision of the crag associated with
+-- the altered climb.
+CREATE FUNCTION bump_crag_revision() RETURNS TRIGGER AS $BODY$
+BEGIN
+
+	IF TG_OP = 'UPDATE' OR TG_OP = 'INSERT' THEN
+		UPDATE crags SET revision = NEW.revision
+			WHERE id = NEW.crag_id;
+	ELSE
+		UPDATE crags SET revision = (SELECT nextval('revision_seq'))
+			WHERE id = OLD.crag_id;
+	END IF;
+
+    RETURN NULL;
+END;
+$BODY$ LANGUAGE plpgsql;
+
+CREATE TRIGGER on_climb_insert_update_or_delete
+	AFTER INSERT OR UPDATE OR DELETE ON climbs
+	FOR EACH ROW EXECUTE PROCEDURE bump_crag_revision();
