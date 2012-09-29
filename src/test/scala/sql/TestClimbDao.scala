@@ -228,10 +228,48 @@ class ClimbDaoTest extends FunSpec
     }
 
     describe("The update action") {
-      it("should update an existing climb successfully") (pending)
-      it("should inform if the climb has been updated concurrently") (pending)
+      it("should update an existing climb successfully") {
+        val (first, second) = run {
+          for {
+            _ <- CragDao.create(burbage)
+            first <- climbDao.create(harvest)
+            second <- climbDao.update(Revisioned[Climb](first.revision, newHarvest))
+          } yield (first, second)
+        } getOrElse fail("Failed to create fixtures")
+
+        first.revision should be < (second.revision)
+        second.model should equal (newHarvest)
+      }
+
+      it("should inform if the climb has been updated concurrently") {
+        val (first, second) = run {
+          for {
+            _ <- CragDao.create(burbage)
+            first <- climbDao.create(harvest)
+            second <- climbDao.update(Revisioned[Climb](first.revision, newHarvest))
+          } yield (first, second)
+        } getOrElse fail("Failed to create fixtures")
+
+        val rev = run {
+          climbDao.update(Revisioned[Climb](first.revision, harvest))
+        }.swap getOrElse fail("Managed to update climb despite old revision")
+
+        rev should equal (EditConflict())
+      }
+
       it("should inform if the crag is being updated concurrently in an other transaction") (pending)
-      it("should bump the Crag's revision number when updating the Climb") (pending)
+
+      it("should bump the Crag's revision number when updating the Climb") {
+        val (first, second) = run {
+          for {
+            first  <- CragDao.create(burbage)
+            _      <- climbDao.create(harvest)
+            second <- CragDao.get("burbage")
+          } yield (first, second)
+        } getOrElse fail("Failed to create crag fixture")
+
+        first.revision should be < (second.revision)
+      }
     }
 
     describe("The delete action") {
