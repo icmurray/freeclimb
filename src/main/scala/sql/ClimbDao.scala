@@ -182,8 +182,47 @@ trait ClimbDao extends Repository[Climb] {
     }
   }
 
-  override def purge(climb: Revisioned[Climb]) = ApiAction { session =>
-    NotImplemented().left
+  override def purge(climbRev: Revisioned[Climb]) = ApiAction { session =>
+    implicit val connection = session.dbConnection
+    try {
+
+      get(climbRev.model.crag.name, climbRev.model.name).runWith(session).fold (
+        error => error.left,
+        currentRevision => currentRevision match {
+
+          case latest if latest.revision != climbRev.revision => EditConflict().left
+          case _ =>
+            val climbId = SQL(
+              """
+              SELECT climb_id FROM climb_history
+                WHERE name = {name}
+                  AND revision = {revision}
+              """
+            ).on(
+              "name"     -> climbRev.model.name,
+              "revision" -> climbRev.revision
+            ).as(scalar[Long].single)
+
+            SQL(
+              """
+              DELETE from climb_history
+                WHERE climb_id = {climb_id};
+              DELETE FROM climbs
+                WHERE id = {climb_id}
+              """
+            ).on(
+              "climb_id" -> climbId
+            ).execute()
+            climbRev.right
+        }
+      )
+    } catch {
+      case e: SQLException => e.sqlError match {
+        case Some(SerializationFailure) =>  EditConflict().left
+        case _                          =>  throw e
+      }
+      case e                            =>  throw e
+    }
   }
 
   private lazy val climb = {
