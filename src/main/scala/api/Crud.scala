@@ -22,16 +22,40 @@ trait CrudApi {
   def createClimb(climb: Climb)             = climbDao.create(climb)
   def updateClimb(climb: Revisioned[Climb]) = climbDao.update(climb)
   def deleteClimb(climb: Revisioned[Climb]) = climbDao.delete(climb)
-  //def getClimb(name: String)                = climbDao.get(name)
+  def getClimb(crag: String, climb: String) = climbDao.get(crag, climb)
 
   // These are here to check that the isolation level checking works.
-  // This one should compile:
-  def runCreateClimbWorks(climb: Climb)(session: DbSession[TransactionSerializable]): Disjunction[ActionFailure, Revisioned[Climb]] =
-    createClimb(climb).runInTransaction(session)
 
-  // As should this one:
-  def runCreateClimbWorksToo(climb: Climb)(session: DbSession[TransactionRepeatableRead]): Disjunction[ActionFailure, Revisioned[Climb]] =
-    createClimb(climb).runInTransaction(session)
+  // This is a combined action with type inference:
+  def createUpdateThenGet(climb: Climb) = for {
+    cragRev  <- cragDao.create(climb.crag)
+    climbRev <- climbDao.create(climb)
+    _        <- climbDao.update(climbRev)
+    result   <- climbDao.get(climb.crag.name, climb.name)
+  } yield result
+
+  // This is a combined action with explicit type
+  def createUpdateThenGetExplicit(climb: Climb): ApiUpdateAction[Revisioned[Climb]]  = for {
+    cragRev  <- cragDao.create(climb.crag)
+    climbRev <- climbDao.create(climb)
+    _        <- climbDao.update(climbRev)
+    result   <- climbDao.get(climb.crag.name, climb.name)
+  } yield result
+
+  // This *runs* an action at the correction islation level
+  def runCreateUpdateThenGet(climb: Climb)(session: DbSession[TransactionSerializable]) = {
+    createUpdateThenGet(climb).runInTransaction(session)
+  }
+
+  def runRead(climb: Climb)(session: DbSession[TransactionReadCommitted]) = {
+    getClimb(climb.crag.name, climb.name).runInTransaction(session)
+  }
+
+  // This *runs* acn action at the wrong isolation level
+  // It should *not* compile
+  //def runCreateUpdateThenGet(climb: Climb)(session: DbSession[TransactionReadCommitted]) = {
+  //  createUpdateThenGet(climb).runInTransaction(session)
+  //}
 
   // And when uncommented, this one shouldn't:
   //def runCreateClimbShouldNotWork(climb: Climb)(session: DbSession[TransactionNone]): Disjunction[ActionFailure, Revisioned[Climb]] =
