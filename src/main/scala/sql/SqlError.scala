@@ -9,6 +9,7 @@ trait WithSqlError {
 object SqlError extends Enumeration {
   type SqlError = Value
   val NotNullViolation = Value("23502")
+  val ForeignKeyViolation = Value("23503")
   val UniqueViolation = Value("23505")
   val CheckViolation = Value("23514")
   val SerializationFailure = Value("40001")

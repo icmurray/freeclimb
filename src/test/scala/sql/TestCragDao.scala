@@ -365,7 +365,18 @@ class CragDaoTest extends FunSpec
         }.swap getOrElse fail("Delete should have failed")
       }
 
-      it("should fail if the crag has climbs associated with it") (pending)
+      it("should fail if the crag has climbs associated with it") {
+        val result = run {
+          for {
+            rev1 <- cragDao.create(burbage)
+            _    <- ClimbDao.create(harvest)
+            rev2 <- cragDao.get("burbage")
+            res  <- cragDao.delete(rev2)
+          } yield res
+        }.swap getOrElse fail("Deleted crag with climbs associated")
+
+        result should equal (ValidationError())
+      }
 
     }
 
@@ -540,7 +551,18 @@ class CragDaoTest extends FunSpec
         result should equal (NotFound())
       }
       
-      it("should fail if the crag has climbs associated with it") (pending)
+      it("should fail if the crag has climbs associated with it") {
+        val result = run {
+          for {
+            rev1 <- cragDao.create(burbage)
+            _    <- ClimbDao.create(harvest)
+            rev2 <- cragDao.get("burbage")
+            res  <- cragDao.purge(rev2)
+          } yield res
+        }.swap getOrElse fail("Purged crag with climbs associated")
+
+        result should equal (ValidationError())
+      }
     }
 
   }
@@ -548,4 +570,11 @@ class CragDaoTest extends FunSpec
   private val burbage = Crag.makeUnsafe("burbage", "Burbage")
   private val newBurbage = Crag.makeUnsafe("burbage", "BURBAGE")
   private val newestBurbage = Crag.makeUnsafe("burbage", "BURBAGE BURBAGE")
+  
+  private val harvest = Climb.makeUnsafe(
+    "harvest",
+    "Harvest",
+    "It is brutal, and on the wrong crag.",
+    burbage,
+    EuSport(Grade.EuSport.Eu7a))
 }

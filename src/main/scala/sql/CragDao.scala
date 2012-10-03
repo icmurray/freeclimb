@@ -77,6 +77,7 @@ trait CragDao extends Repository[Crag] {
     } catch {
       case e: SQLException => e.sqlError match {
         case Some(SerializationFailure) =>  EditConflict().left
+        case Some(ForeignKeyViolation)  =>  ValidationError().left
         case _                          =>  throw e
       }
       case e                            =>  throw e
@@ -121,6 +122,7 @@ trait CragDao extends Repository[Crag] {
     } catch {
       case e: SQLException => e.sqlError match {
         case Some(SerializationFailure) =>  EditConflict().left
+        case Some(ForeignKeyViolation)  =>  ValidationError().left
         case _                          =>  throw e
       }
       case e                            =>  throw e
