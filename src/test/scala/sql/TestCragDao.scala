@@ -466,7 +466,7 @@ class CragDaoTest extends FunSpec
           } yield (rev1, rev2)
         } getOrElse fail ("Error setting up fixture")
 
-        // Check deleted list is empty
+        // Check the deleted list
         val deletedList = run {
           cragDao.deletedList()
         } getOrElse fail("Error retrieving deleted list")

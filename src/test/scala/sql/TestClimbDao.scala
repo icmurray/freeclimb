@@ -406,8 +406,81 @@ class ClimbDaoTest extends FunSpec
     }
 
     describe("The deleted list action") {
-      it("should be empty if no climbs have been deleted") (pending)
-      it("should contain only the latest revision of a deleted climb") (pending)
+      it("should be empty if no climbs have been deleted") {
+        val deletedList = run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+            _   <- climbDao.update(Revisioned[Climb](rev.revision, newHarvest))
+            del <- climbDao.deletedList()
+          } yield del
+        } getOrElse fail("Could not create fixtures")
+
+        deletedList.toList should equal (Nil)
+      }
+
+      it("should contain only the latest revision of a deleted climb") {
+        // Create a climb, update it once, then delete it
+        val (rev1, rev2) = run {
+          for {
+            _    <- CragDao.create(burbage)
+            rev1 <- climbDao.create(harvest)
+            rev2 <- climbDao.update(Revisioned[Climb](rev1.revision, newHarvest))
+            _    <- climbDao.delete(rev2)
+          } yield (rev1, rev2)
+        } getOrElse fail("Error setting up fixture")
+
+        // Check the deleted list
+        val deletedList = run {
+          climbDao.deletedList()
+        } getOrElse fail("Error retrieving deleted list")
+
+        deletedList.toList should contain (rev2)
+        deletedList.toList should not contain (rev1)
+      }
+
+      it("should return a deleted climb even if the crag has been deleted") {
+        val (cragRev, rev1, rev2) = run {
+          for {
+            _       <- CragDao.create(burbage)
+            rev1    <- climbDao.create(harvest)
+            rev2    <- climbDao.update(Revisioned[Climb](rev1.revision, newHarvest))
+            _       <- climbDao.delete(rev2)
+            cragRev <- CragDao.get("burbage")
+            _       <- CragDao.delete(cragRev)
+          } yield (cragRev, rev1, rev2)
+        } getOrElse fail("Error creating fixtures")
+
+        // Check the deleted list
+        val deletedList = run {
+          climbDao.deletedList()
+        } getOrElse fail("Error retrieving deleted list")
+
+        deletedList.toList should equal(List(rev2))
+      }
+
+      it("should return the *latest* crag along with the climb") {
+        // Create a new climb, update it, and update the crag it belongs to.
+        val (cragRev, rev1, rev2) = run {
+          for {
+            _        <- CragDao.create(burbage)
+            rev1     <- climbDao.create(harvest)
+            rev2     <- climbDao.update(Revisioned[Climb](rev1.revision, newHarvest))
+            _        <- climbDao.delete(rev2)
+            origCrag <- CragDao.get("burbage")
+            cragRev  <- CragDao.update(Revisioned[Crag](origCrag.revision, newBurbage))
+          } yield (cragRev, rev1, rev2)
+        } getOrElse fail("Error creating fixtures")
+
+        // Check the deleted list contains the deleted crag, but that it references
+        // the *latest* crag, not the crag it originally referenced.
+        val deletedList = run {
+          climbDao.deletedList()
+        } getOrElse fail("Error retrieving deleted list")
+
+        deletedList.length should equal (1)
+        deletedList.toList.head.model.crag should equal (cragRev.model)
+      }
     }
 
     describe("The purge action") {
@@ -420,6 +493,7 @@ class ClimbDaoTest extends FunSpec
   }
   
   private val burbage = Crag.makeUnsafe("burbage", "Burbage")
+  private val newBurbage = Crag.makeUnsafe("burbage", "BURBAGE")
   private val stanage = Crag.makeUnsafe("stanage", "Stanage")
 
   private val harvest = Climb.makeUnsafe(

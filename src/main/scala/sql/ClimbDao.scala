@@ -52,7 +52,7 @@ trait ClimbDao extends Repository[Climb] {
     ).on(
       "crag_name" -> crag,
       "climb_name" -> climb
-    ).as(revisionedClimb("climbs").singleOpt).right
+    ).as(revisionedClimb("climbs", "crags").singleOpt).right
   }
 
   override def create(climb: Climb) = ApiAction { session =>
@@ -247,15 +247,39 @@ trait ClimbDao extends Repository[Climb] {
     ).on(
       "climb_name" -> climb.name,
       "crag_name"  -> climb.crag.name
-    ).as(revisionedClimb("climb_history") *).right
+    ).as(revisionedClimb("climb_history", "crags") *).right
   }
 
-  private def climb(col: String) = {
+  def deletedList(): ApiReadAction[Seq[Revisioned[Climb]]] = ApiReadAction { session =>
+    implicit val connection = session.dbConnection
+    SQL(
+      """
+      SELECT DISTINCT ON (climb_history.climb_id, crag_history.crag_id)
+             climb_history.name,
+             climb_history.title,
+             climb_history.description,
+             climb_history.revision,
+             crag_history.name,
+             crag_history.title,
+             grades.grading_system::varchar,
+             grades.difficulty FROM climb_history
+        LEFT OUTER JOIN climbs ON climbs.id = climb_history.climb_id
+        INNER JOIN crag_history ON climb_history.crag_id = crag_history.crag_id
+        INNER JOIN grades ON climb_history.grade_id = grades.id
+        WHERE climbs.id IS NULL
+        ORDER BY climb_history.climb_id, crag_history.crag_id,
+                 climb_history.revision DESC,
+                 crag_history.revision DESC
+      """
+    ).as(revisionedClimb("climb_history", "crag_history") *).right
+  }
+
+  private def climb(climbTable: String, cragTable: String) = {
     grade ~
-    crag ~
-    str(col + ".name") ~
-    str(col + ".title") ~
-    str(col + ".description") map {
+    crag(cragTable) ~
+    str(climbTable + ".name") ~
+    str(climbTable + ".title") ~
+    str(climbTable + ".description") map {
       case grade~crag~name~title~description => Climb.makeUnsafe(
         name,
         title,
@@ -272,15 +296,15 @@ trait ClimbDao extends Repository[Climb] {
     }
   }
 
-  private lazy val crag = {
-    str("crags.name") ~
-    str("crags.title") map {
+  private def crag(table: String) = {
+    str(table + ".name") ~
+    str(table + ".title") map {
       case name~title => Crag.makeUnsafe(name, title)
     }
   }
 
-  private def revisionedClimb(col: String) = {
-    climb(col) ~ int(col + ".revision") map {
+  private def revisionedClimb(climbTable: String, cragTable: String) = {
+    climb(climbTable, cragTable) ~ int(climbTable + ".revision") map {
       case climb~revision => Revisioned[Climb](revision, climb)
     }
   }
