@@ -66,14 +66,20 @@ CREATE TRIGGER on_climb_insert_or_update
 -- Setup a trigger that bumps the revision of the crag associated with
 -- the altered climb.
 CREATE FUNCTION bump_crag_revision() RETURNS TRIGGER AS $BODY$
+DECLARE
+    next_revision bigint;
 BEGIN
 
 	IF TG_OP = 'UPDATE' OR TG_OP = 'INSERT' THEN
 		UPDATE crags SET revision = NEW.revision
 			WHERE id = NEW.crag_id;
 	ELSE
-		UPDATE crags SET revision = (SELECT nextval('revision_seq'))
+        next_revision := (SELECT nextval('revision_seq'));
+		UPDATE crags SET revision = next_revision
 			WHERE id = OLD.crag_id;
+        UPDATE climb_history SET revision = next_revision
+            WHERE climb_id = OLD.id
+              AND revision = OLD.revision;
 	END IF;
 
     RETURN NULL;

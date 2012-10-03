@@ -435,8 +435,8 @@ class ClimbDaoTest extends FunSpec
           climbDao.deletedList()
         } getOrElse fail("Error retrieving deleted list")
 
-        deletedList.toList should contain (rev2)
-        deletedList.toList should not contain (rev1)
+        deletedList.toList.map { _.model } should contain (newHarvest)
+        deletedList.toList.map { _.model } should not contain (harvest)
       }
 
       it("should return a deleted climb even if the crag has been deleted") {
@@ -456,7 +456,7 @@ class ClimbDaoTest extends FunSpec
           climbDao.deletedList()
         } getOrElse fail("Error retrieving deleted list")
 
-        deletedList.toList should equal(List(rev2))
+        deletedList.toList.map { _.model } should equal (List(newHarvest))
       }
 
       it("should return the *latest* crag along with the climb") {
@@ -604,6 +604,47 @@ class ClimbDaoTest extends FunSpec
 
         result.map { _.model } should contain (newHarvest)
         result.map { _.model } should not contain (sorb)
+        result.length should equal (1)
+      }
+    }
+
+    describe("the climbsDeletedSince action") {
+      it("should return empty for the latest revision of a crag") {
+        val result = run {
+          for {
+            _ <- CragDao.create(burbage)
+            r <- climbDao.create(harvest)
+            _ <- climbDao.update(Revisioned[Climb](r.revision, newHarvest))
+            _ <- climbDao.create(sorb)
+            c <- CragDao.get("burbage")
+            result <- climbDao.climbsDeletedSince(c)
+          } yield result
+        } getOrElse fail("Failed to setup fixtures")
+
+        result should equal (Nil)
+      }
+
+      it("should return empty if the crag doesn't exist") {
+        val result = run {
+          climbDao.climbsDeletedSince(Revisioned[Crag](1, burbage))
+        } getOrElse fail("Failed to retrieve list of updates with non-existant crag")
+
+        result should equal (Nil)
+      }
+
+      it("should return the last version of a climb deleted since the given crag revision") {
+        val result = run {
+          for {
+            _       <- CragDao.create(burbage)
+            _       <- climbDao.create(sorb)
+            rev     <- climbDao.create(harvest)
+            cragRev <- CragDao.get("burbage")
+            _       <- climbDao.delete(rev)
+            result  <- climbDao.climbsDeletedSince(cragRev)
+          } yield result
+        } getOrElse fail("Failed to setup fixtures")
+
+        result.map { _.model } should contain (harvest)
         result.length should equal (1)
       }
     }
