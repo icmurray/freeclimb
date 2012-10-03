@@ -550,6 +550,64 @@ class ClimbDaoTest extends FunSpec
       }
     }
 
+    describe("the climbsCreatedOrUpdatedSince action") {
+      it("should return empty for the latest revision of a crag") {
+        val result = run {
+          for {
+            _ <- CragDao.create(burbage)
+            r <- climbDao.create(harvest)
+            _ <- climbDao.update(Revisioned[Climb](r.revision, newHarvest))
+            _ <- climbDao.create(sorb)
+            c <- CragDao.get("burbage")
+            result <- climbDao.climbsCreatedOrUpdatedSince(c)
+          } yield result
+        } getOrElse fail("Failed to setup fixtures")
+
+        result should equal (Nil)
+      }
+
+      it("should return empty if the crag doesn't exist") {
+        val result = run {
+          climbDao.climbsCreatedOrUpdatedSince(Revisioned[Crag](1, burbage))
+        } getOrElse fail("Failed to retrieve list of updates with non-existant crag")
+
+        result should equal (Nil)
+      }
+
+      it("should return a climb created since last revision") {
+        val result = run {
+          for {
+            _       <- CragDao.create(burbage)
+            _       <- climbDao.create(harvest)
+            cragRev <- CragDao.get("burbage")
+            _       <- climbDao.create(sorb)
+            result  <- climbDao.climbsCreatedOrUpdatedSince(cragRev)
+          } yield result
+        } getOrElse fail("Failed to setup fixtures")
+
+        result.map { _.model } should not contain (harvest)
+        result.map { _.model } should contain (sorb)
+        result.length should equal (1)
+      }
+
+      it("should return the latest revision of a climb updated since crag was created") {
+        val result = run {
+          for {
+            _       <- CragDao.create(burbage)
+            _       <- climbDao.create(sorb)
+            rev     <- climbDao.create(harvest)
+            cragRev <- CragDao.get("burbage")
+            _       <- climbDao.update(Revisioned[Climb](rev.revision, newHarvest))
+            result  <- climbDao.climbsCreatedOrUpdatedSince(cragRev)
+          } yield result
+        } getOrElse fail("Failed to setup fixtures")
+
+        result.map { _.model } should contain (newHarvest)
+        result.map { _.model } should not contain (sorb)
+        result.length should equal (1)
+      }
+    }
+
   }
   
   private val burbage = Crag.makeUnsafe("burbage", "Burbage")
@@ -577,7 +635,12 @@ class ClimbDaoTest extends FunSpec
     stanage,
     UkTrad(Grade.UkAdjective.E4, Grade.UkTechnical.T6a))
 
-
+  private val sorb = Climb.makeUnsafe(
+    "sorb",
+    "Sorb",
+    "It's Sorb",
+    burbage,
+    UkTrad(Grade.UkAdjective.E2, Grade.UkTechnical.T5c))
 
 }
 

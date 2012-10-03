@@ -274,6 +274,29 @@ trait ClimbDao extends Repository[Climb] {
     ).as(revisionedClimb("climb_history", "crag_history") *).right
   }
 
+  def climbsCreatedOrUpdatedSince(crag: Revisioned[Crag]) = ApiReadAction { session =>
+    implicit val connection = session.dbConnection
+    SQL(
+      """
+      SELECT climbs.name,
+             climbs.title,
+             climbs.description,
+             climbs.revision,
+             crags.name,
+             crags.title,
+             grades.grading_system::varchar,
+             grades.difficulty FROM climbs
+      INNER JOIN crags ON climbs.crag_id = crags.id
+      INNER JOIN grades ON climbs.grade_id = grades.id
+      WHERE crags.name = {crag_name}
+        AND climbs.revision > {latest_revision}
+      """
+    ).on(
+      "crag_name" -> crag.model.name,
+      "latest_revision" -> crag.revision
+    ).as(revisionedClimb("climbs", "crags") *).right
+  }
+
   private def climb(climbTable: String, cragTable: String) = {
     grade ~
     crag(cragTable) ~
