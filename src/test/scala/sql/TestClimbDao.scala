@@ -343,10 +343,66 @@ class ClimbDaoTest extends FunSpec
     }
 
     describe("The history action") {
-      it("should return an existing climb's history of edits") (pending)
-      it("should return the empty list for a climb that doesn't exist") (pending)
-      it("should return the empty list for a climb that has been deleted") (pending)
-      it("should not return the old history for a new climb that overwrites an old climb") (pending)
+      it("should return an existing climb's history of edits") {
+        val (rev1, rev2) = run {
+          for {
+            _    <- CragDao.create(burbage)
+            rev1 <- climbDao.create(harvest)
+            rev2 <- climbDao.update(Revisioned[Climb](rev1.revision, newHarvest))
+          } yield (rev1, rev2)
+        } getOrElse fail ("Couldn't create climb fixture")
+
+        val history = run {
+          climbDao.history(harvest)
+        } getOrElse fail("Couldn't retrieve history")
+
+        history.toList should equal (List(rev2, rev1))
+      }
+
+      it("should return the empty list for a climb that doesn't exist") {
+        val history = run {
+          climbDao.history(harvest)
+        } getOrElse fail("Couldn't retrieve history")
+
+        history.toList should equal (Nil)
+      }
+
+      it("should return the empty list for a climb that has been deleted") {
+
+        run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+            _   <- climbDao.delete(rev)
+          } yield ()
+        } getOrElse fail("Could not create fixtures")
+
+        val history = run {
+          climbDao.history(harvest)
+        } getOrElse fail("Couldn't retrieve history")
+
+        history.toList should equal (Nil)
+      }
+
+      it("should not return the old history for a new climb that overwrites an old climb") {
+        run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+            _   <- climbDao.delete(rev)
+          } yield ()
+        } getOrElse fail("Could not create fixtures")
+
+        val newRev = run {
+          climbDao.create(newHarvest)
+        } getOrElse fail("Couldn't re-create crag")
+
+        val history = run {
+          climbDao.history(harvest)
+        } getOrElse fail("Couldn't retrieve history")
+
+        history.toList should equal (List(newRev))
+      }
     }
 
     describe("The deleted list action") {

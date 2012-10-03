@@ -52,7 +52,7 @@ trait ClimbDao extends Repository[Climb] {
     ).on(
       "crag_name" -> crag,
       "climb_name" -> climb
-    ).as(revisionedClimb.singleOpt).right
+    ).as(revisionedClimb("climbs").singleOpt).right
   }
 
   override def create(climb: Climb) = ApiAction { session =>
@@ -225,12 +225,37 @@ trait ClimbDao extends Repository[Climb] {
     }
   }
 
-  private lazy val climb = {
+  def history(climb: Climb): ApiReadAction[Seq[Revisioned[Climb]]] = ApiReadAction { session =>
+    implicit val connection = session.dbConnection
+    SQL(
+      """
+      SELECT climb_history.name,
+             climb_history.title,
+             climb_history.description,
+             climb_history.revision,
+             crags.name,
+             crags.title,
+             grades.grading_system::varchar,
+             grades.difficulty FROM climb_history
+      INNER JOIN climbs ON climb_history.climb_id = climbs.id
+      INNER JOIN crags ON climb_history.crag_id = crags.id
+      INNER JOIN grades ON climb_history.grade_id = grades.id
+      WHERE crags.name = {crag_name}
+        AND climb_history.name = {climb_name}
+      ORDER BY climb_history.revision DESC
+      """
+    ).on(
+      "climb_name" -> climb.name,
+      "crag_name"  -> climb.crag.name
+    ).as(revisionedClimb("climb_history") *).right
+  }
+
+  private def climb(col: String) = {
     grade ~
     crag ~
-    str("climbs.name") ~
-    str("climbs.title") ~
-    str("climbs.description") map {
+    str(col + ".name") ~
+    str(col + ".title") ~
+    str(col + ".description") map {
       case grade~crag~name~title~description => Climb.makeUnsafe(
         name,
         title,
@@ -254,8 +279,8 @@ trait ClimbDao extends Repository[Climb] {
     }
   }
 
-  private lazy val revisionedClimb = {
-    climb ~ int("climbs.revision") map {
+  private def revisionedClimb(col: String) = {
+    climb(col) ~ int(col + ".revision") map {
       case climb~revision => Revisioned[Climb](revision, climb)
     }
   }
