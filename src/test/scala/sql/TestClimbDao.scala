@@ -484,10 +484,70 @@ class ClimbDaoTest extends FunSpec
     }
 
     describe("The purge action") {
-      it("should remove the climb and its history") (pending)
-      it("should be possible to create a new climb with the same name as a previsously purged climb") (pending)
-      it("should inform if the climb has been updated concurrently") (pending)
-      it("should inform if the climb has been purged concurrently") (pending)
+      it("should remove the climb and its history") {
+        val someClimb = run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+            _   <- climbDao.purge(rev)
+            del <- climbDao.getOption("burbage", "harvest")
+          } yield (del)
+        } getOrElse fail("Failed to create fixture")
+
+        // Check it was deleted
+        someClimb should equal (None)
+
+        // Check it's not in the deletedClimbs list
+        val deletedList = run {
+          climbDao.deletedList()
+        } getOrElse fail("Error retrieving deletedList")
+
+        deletedList should equal (Nil)
+      }
+
+      it("should be possible to create a new climb with the same name as a previsously purged climb") {
+        val newRev = run {
+          for {
+            _    <- CragDao.create(burbage)
+            rev1 <- climbDao.create(harvest)
+            _    <- climbDao.purge(rev1)
+            rev2 <- climbDao.create(newHarvest)
+          } yield rev2
+        } getOrElse fail("Failed to create fixtures")
+
+        newRev.model should equal (newHarvest)
+      }
+
+      it("should inform if the climb has been updated concurrently") {
+        val climbRev = run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+          } yield rev
+        } getOrElse fail("Failed to create Climb")
+
+        val result = run {
+          climbDao.purge(Revisioned[Climb](climbRev.revision-1, climbRev.model))
+        }.swap getOrElse fail("Purge should have failed")
+
+        result should equal (EditConflict())
+      }
+
+      it("should inform if the climb has been purged concurrently") {
+        val climbRev = run {
+          for {
+            _   <- CragDao.create(burbage)
+            rev <- climbDao.create(harvest)
+            _   <- climbDao.purge(rev)
+          } yield rev
+        } getOrElse fail("Failed to create and purge Climb")
+
+        val result = run {
+          climbDao.purge(climbRev)
+        }.swap getOrElse fail("Delete should have failed")
+
+        result should equal (NotFound())
+      }
     }
 
   }
@@ -499,7 +559,7 @@ class ClimbDaoTest extends FunSpec
   private val harvest = Climb.makeUnsafe(
     "harvest",
     "Harvest",
-    "It is brutal",
+    "It is brutal, and on the wrong crag.",
     burbage,
     EuSport(Grade.EuSport.Eu7a))
 

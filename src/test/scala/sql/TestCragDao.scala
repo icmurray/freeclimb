@@ -521,6 +521,8 @@ class CragDaoTest extends FunSpec
         val result = run {
           cragDao.purge(Revisioned[Crag](cragRev.revision-1, cragRev.model))
         }.swap getOrElse fail("Purge should have failed")
+        
+        result should equal (EditConflict())
       }
 
       it("should inform if the crag has been purged concurrently") {
@@ -532,8 +534,10 @@ class CragDaoTest extends FunSpec
         } getOrElse fail("Failed to create and purge Crag")
 
         val result = run {
-          cragDao.purge(Revisioned[Crag](cragRev.revision, cragRev.model))
+          cragDao.purge(cragRev)
         }.swap getOrElse fail("Delete should have failed")
+        
+        result should equal (NotFound())
       }
       
       it("should fail if the crag has climbs associated with it") (pending)
