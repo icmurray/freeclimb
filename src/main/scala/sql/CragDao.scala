@@ -40,8 +40,7 @@ trait CragDao extends Repository[Crag] {
            "revision" -> nextRevision
       ).executeInsert()
 
-      val created = Revisioned[Crag](nextRevision, crag)
-      (List(CragCreated(created)), created).right
+      created(crag, nextRevision).right
 
     } catch {
       case e: SQLException => e.sqlError match {
@@ -72,7 +71,7 @@ trait CragDao extends Repository[Crag] {
             ).on(
               "name"     -> crag.name
             ).execute()
-            (List(CragDeleted(cragRev)), cragRev).right
+            deleted(cragRev).right
         }
       )
     } catch {
@@ -117,7 +116,7 @@ trait CragDao extends Repository[Crag] {
             ).on(
               "crag_id" -> cragId
             ).execute()
-            (List(CragDeleted(cragRev)), cragRev).right
+            purged(cragRev).right
         }
       )
     } catch {
@@ -154,8 +153,7 @@ trait CragDao extends Repository[Crag] {
               "revision" -> nextRevision,
               "name"     -> crag.name
             ).execute()
-            val updated = Revisioned[Crag](nextRevision, crag)
-            (List(CragUpdated(updated)), updated).right
+            updated(crag, nextRevision).right
         }
       )
     } catch {
@@ -229,5 +227,22 @@ trait CragDao extends Repository[Crag] {
     }
   }
 
+  private def created(crag: Crag, revision: Long) = {
+    val rev = Revisioned[Crag](revision, crag)
+    (List(CragCreated(rev)), rev)
+  }
+
+  private def updated(crag: Crag, revision: Long) = {
+    val rev = Revisioned[Crag](revision, crag)
+    (List(CragUpdated(rev)), rev)
+  }
+
+  private def deleted(rev: Revisioned[Crag]) = {
+    (List(CragDeleted(rev)), rev)
+  }
+
+  private def purged(rev: Revisioned[Crag]) = {
+    (List(CragPurged(rev)), rev)
+  }
 }
 

@@ -24,12 +24,9 @@ case class ActionT[M[+_], +A, -I <: IsolationLevel, W <: List[ActionEvent]](g: D
         connection.rollback()
       } else {
         connection.commit()
-        val actions = M.map(result) { case (w,a) => w }
-        println("Actions that occurred: ")
-        M.map(actions) { l => l map println }
-        println
       }
 
+      // discard the ActionEvent log from the results
       M.map(result) { case (w,a) => a }
     } catch {
       case e => connection.rollback() ; throw e

@@ -90,8 +90,7 @@ trait ClimbDao extends Repository[Climb] {
            "difficulty"         -> climb.grade.difficulty
       ).executeInsert()
 
-      val created = Revisioned[Climb](nextRevision, climb)
-      (List(ClimbCreated(created)), created).right
+      created(climb, nextRevision).right
     } catch {
       case e: SQLException => e.sqlError match {
         case Some(UniqueViolation)  => EditConflict().left
@@ -137,8 +136,7 @@ trait ClimbDao extends Repository[Climb] {
               "grading_system" -> climb.grade.system.toString,
               "difficulty"     -> climb.grade.difficulty
             ).execute()
-            val updated = Revisioned[Climb](nextRevision, climb)
-            (List(ClimbUpdated(updated)), updated).right
+            updated(climb, nextRevision).right
         }
       )
     } catch {
@@ -172,8 +170,7 @@ trait ClimbDao extends Repository[Climb] {
               "name"      -> climb.name,
               "crag_name" -> climb.crag.name
             ).execute()
-            val deleted = climbRev
-            (List(ClimbDeleted(deleted)), deleted).right
+            deleted(climbRev).right
         }
       )
     } catch {
@@ -216,8 +213,7 @@ trait ClimbDao extends Repository[Climb] {
             ).on(
               "climb_id" -> climbId
             ).execute()
-            val purged = climbRev
-            (List(ClimbDeleted(purged)), purged).right
+            purged(climbRev).right
         }
       )
     } catch {
@@ -364,5 +360,22 @@ trait ClimbDao extends Repository[Climb] {
     }
   }
 
+  private def created(climb: Climb, revision: Long) = {
+    val rev = Revisioned[Climb](revision, climb)
+    (List(ClimbCreated(rev)), rev)
+  }
+
+  private def updated(climb: Climb, revision: Long) = {
+    val rev = Revisioned[Climb](revision, climb)
+    (List(ClimbUpdated(rev)), rev)
+  }
+
+  private def deleted(rev: Revisioned[Climb]) = {
+    (List(ClimbDeleted(rev)), rev)
+  }
+
+  private def purged(rev: Revisioned[Climb]) = {
+    (List(ClimbPurged(rev)), rev)
+  }
 }
 
