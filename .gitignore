@@ -4,3 +4,4 @@ target/
 
 # Dev database.
 freeclimb-dev.pg
+solr-server

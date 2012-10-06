@@ -11,6 +11,8 @@ parallelExecution in Test := false
 // The Typesafe repository 
 resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/"
 
+libraryDependencies += "com.github.seratch" %% "scalikesolr" % "(3.6,)"
+
 libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.0-M3"
 
 
