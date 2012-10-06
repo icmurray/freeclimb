@@ -10,6 +10,9 @@ import org.scalatest.matchers.ShouldMatchers
 import anorm._
 import anorm.SqlParser._
 
+import scalaz._
+import Scalaz._
+
 import freeclimb.api._
 import freeclimb.models._
 import freeclimb.sql._
@@ -152,7 +155,7 @@ class CragDaoTest extends FunSpec
         val newCrag = cragDao.create(burbage).runWith(session1)
         newCrag.fold (
           error => { session1.dbConnection.close() ; fail ("Couldn't create crag") },
-          success => success.model should equal (burbage)
+          success => success._2.model should equal (burbage)
         )
 
         // Now, create a second session to create the same Crag concurrently.
@@ -234,7 +237,7 @@ class CragDaoTest extends FunSpec
         val updatedCrag = cragDao.update(update1).runWith(session1)
         updatedCrag.fold (
           error => { session1.dbConnection.close() ; fail ("Couldn't update crag") },
-          success => success.model should equal (update1.model)
+          success => success._2.model should equal (update1.model)
         )
 
         // Now, create a second session to update the same Crag concurrently.

@@ -40,7 +40,8 @@ trait CragDao extends Repository[Crag] {
            "revision" -> nextRevision
       ).executeInsert()
 
-      Revisioned[Crag](nextRevision, crag).right
+      val created = Revisioned[Crag](nextRevision, crag)
+      (List(CragCreated(created)), created).right
 
     } catch {
       case e: SQLException => e.sqlError match {
@@ -60,7 +61,7 @@ trait CragDao extends Repository[Crag] {
       get(cragRev.model.name).runWith(session).fold (
         error => error.left,
         currentRevision => currentRevision match {
-          case latest if latest.revision != cragRev.revision => EditConflict().left
+          case (_,latest) if latest.revision != cragRev.revision => EditConflict().left
           case _ =>
             val crag = cragRev.model
 
@@ -71,7 +72,7 @@ trait CragDao extends Repository[Crag] {
             ).on(
               "name"     -> crag.name
             ).execute()
-            cragRev.right
+            (List(CragDeleted(cragRev)), cragRev).right
         }
       )
     } catch {
@@ -93,7 +94,7 @@ trait CragDao extends Repository[Crag] {
         error => error.left,
         currentRevision => currentRevision match {
 
-          case latest if latest.revision != cragRev.revision => EditConflict().left
+          case (_,latest) if latest.revision != cragRev.revision => EditConflict().left
           case _ =>
             val cragId = SQL(
               """
@@ -116,7 +117,7 @@ trait CragDao extends Repository[Crag] {
             ).on(
               "crag_id" -> cragId
             ).execute()
-            cragRev.right
+            (List(CragDeleted(cragRev)), cragRev).right
         }
       )
     } catch {
@@ -136,7 +137,7 @@ trait CragDao extends Repository[Crag] {
       get(cragRev.model.name).runWith(session) fold (
         error => error.left,
         currentRevision => currentRevision match {
-          case latest if latest.revision != cragRev.revision => EditConflict().left
+          case (_,latest) if latest.revision != cragRev.revision => EditConflict().left
           case _ =>
             val crag = cragRev.model
             val nextRevision: Long = SQL("SELECT nextval('revision_seq');").as(scalar[Long].single)
@@ -153,7 +154,8 @@ trait CragDao extends Repository[Crag] {
               "revision" -> nextRevision,
               "name"     -> crag.name
             ).execute()
-            new Revisioned[Crag](nextRevision, crag).right
+            val updated = Revisioned[Crag](nextRevision, crag)
+            (List(CragUpdated(updated)), updated).right
         }
       )
     } catch {

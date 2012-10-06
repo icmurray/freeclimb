@@ -10,6 +10,9 @@ import org.scalatest.matchers.ShouldMatchers
 import anorm._
 import anorm.SqlParser._
 
+import scalaz._
+import Scalaz._
+
 import freeclimb.api._
 import freeclimb.models._
 import freeclimb.sql._

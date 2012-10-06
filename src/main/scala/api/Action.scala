@@ -6,7 +6,7 @@ import Scalaz._
 import freeclimb.models._
 import freeclimb.sql.IsolationLevel
 
-case class ActionT[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
+case class ActionT[M[+_], +A, -I <: IsolationLevel, W <: List[ActionEvent]](g: DbSession[I] => M[(W, A)]) {
 
   def apply(s: DbSession[I]) = g(s)
 
@@ -14,9 +14,9 @@ case class ActionT[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
   def runWith(s: DbSession[I]) = apply(s)
 
   /** Run the action in a transaction. */
-   def runInTransaction(s: DbSession[I])(implicit F: Failable[M[_]]) = {
+   def runInTransaction(s: DbSession[I])(implicit F: Failable[M[_]], M: Functor[M]) = {
     val connection = s.dbConnection
-    try{
+    try {
       connection.setAutoCommit(false)
       connection.setTransactionIsolation(s.jdbcLevel)
       val result = g(s)
@@ -24,8 +24,13 @@ case class ActionT[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
         connection.rollback()
       } else {
         connection.commit()
+        val actions = M.map(result) { case (w,a) => w }
+        println("Actions that occurred: ")
+        M.map(actions) { l => l map println }
+        println
       }
-      result
+
+      M.map(result) { case (w,a) => a }
     } catch {
       case e => connection.rollback() ; throw e
     } finally {
@@ -34,14 +39,19 @@ case class ActionT[M[+_], +A, -I <: IsolationLevel](g: DbSession[I] => M[A]) {
     }
   }
 
-  def map[B](f: A => B)(implicit F: Functor[M]): ActionT[M,B,I] = ActionT[M,B,I]{ s =>
-    F.map(g(s))(f)
+  def map[B](f: A => B)(implicit F: Functor[M]): ActionT[M,B,I,W] = ActionT[M,B,I,W]{ s =>
+    F.map(g(s)) {
+      case (w, a) => (w, f(a))
+    }
   }
 
-  def flatMap[B, II <: I](f: A => ActionT[M,B,II])(implicit M: Bind[M]): ActionT[M,B,II] = ActionT[M,B,II]{ s =>
-    M.bind(g(s))(f(_)(s))
+  def flatMap[B, II <: I](f: A => ActionT[M,B,II,W])(implicit M: Bind[M], W: Semigroup[W]): ActionT[M,B,II,W] = ActionT[M,B,II,W]{ s =>
+    M.bind(g(s)) {
+      case (w1, a) => M.map(f(a)(s)) {
+        case (w2, b) => (W.append(w1,w2), b)
+      }
+    }
   }
-
 }
 
 trait Failable[T] {
@@ -67,9 +77,9 @@ trait ActionTInstances {
    * Ensure that ActionT is seen as a Monad and a Functor when using scalaz.
    * For example, this is necessary when using it with monad transformers.
    */
-  implicit def actionInstance[M[+_], I <: IsolationLevel](implicit M: Monad[M]) = new Monad[({type l[a] = ActionT[M, a, I]})#l] with Functor[({type l[a] = ActionT[M, a, I]})#l] {
-    override def bind[A, B](fa: ActionT[M,A,I])(f: A => ActionT[M,B,I]): ActionT[M,B,I] = fa flatMap f
-    override def point[A](a: => A): ActionT[M,A,I] = ActionT[M,A,I] { _ => M.point(a) }
+  implicit def actionInstance[M[+_], I <: IsolationLevel, W <: List[ActionEvent]](implicit M: Monad[M], W: Monoid[W]) = new Monad[({type l[a] = ActionT[M, a, I, W]})#l] with Functor[({type l[a] = ActionT[M, a, I, W]})#l] {
+    override def bind[A, B](fa: ActionT[M,A,I,W])(f: A => ActionT[M,B,I,W]): ActionT[M,B,I,W] = fa flatMap f
+    override def point[A](a: => A): ActionT[M,A,I,W] = ActionT[M,A,I,W] { _ => M.point((W.zero, a)) }
   }
 }
 

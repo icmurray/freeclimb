@@ -90,7 +90,8 @@ trait ClimbDao extends Repository[Climb] {
            "difficulty"         -> climb.grade.difficulty
       ).executeInsert()
 
-      Revisioned[Climb](nextRevision, climb).right
+      val created = Revisioned[Climb](nextRevision, climb)
+      (List(ClimbCreated(created)), created).right
     } catch {
       case e: SQLException => e.sqlError match {
         case Some(UniqueViolation)  => EditConflict().left
@@ -108,7 +109,7 @@ trait ClimbDao extends Repository[Climb] {
       get(climbRev.model.crag.name, climbRev.model.name).runWith(session) fold (
         error => error.left,
         currentRevision => currentRevision match {
-          case latest if latest.revision != climbRev.revision => EditConflict().left
+          case (_,latest) if latest.revision != climbRev.revision => EditConflict().left
           case _ =>
             val climb = climbRev.model
             val nextRevision: Long = SQL("SELECT nextval('revision_seq');").as(scalar[Long].single)
@@ -136,7 +137,8 @@ trait ClimbDao extends Repository[Climb] {
               "grading_system" -> climb.grade.system.toString,
               "difficulty"     -> climb.grade.difficulty
             ).execute()
-            new Revisioned[Climb](nextRevision, climb).right
+            val updated = Revisioned[Climb](nextRevision, climb)
+            (List(ClimbUpdated(updated)), updated).right
         }
       )
     } catch {
@@ -156,7 +158,7 @@ trait ClimbDao extends Repository[Climb] {
       get(climbRev.model.crag.name, climbRev.model.name).runWith(session).fold (
         error => error.left,
         currentRevision => currentRevision match {
-          case latest if latest.revision != climbRev.revision => EditConflict().left
+          case (_, latest) if latest.revision != climbRev.revision => EditConflict().left
           case _ =>
             val climb = climbRev.model
 
@@ -170,7 +172,8 @@ trait ClimbDao extends Repository[Climb] {
               "name"      -> climb.name,
               "crag_name" -> climb.crag.name
             ).execute()
-            climbRev.right
+            val deleted = climbRev
+            (List(ClimbDeleted(deleted)), deleted).right
         }
       )
     } catch {
@@ -190,7 +193,7 @@ trait ClimbDao extends Repository[Climb] {
         error => error.left,
         currentRevision => currentRevision match {
 
-          case latest if latest.revision != climbRev.revision => EditConflict().left
+          case (_, latest) if latest.revision != climbRev.revision => EditConflict().left
           case _ =>
             val climbId = SQL(
               """
@@ -213,7 +216,8 @@ trait ClimbDao extends Repository[Climb] {
             ).on(
               "climb_id" -> climbId
             ).execute()
-            climbRev.right
+            val purged = climbRev
+            (List(ClimbDeleted(purged)), purged).right
         }
       )
     } catch {

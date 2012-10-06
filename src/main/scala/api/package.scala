@@ -15,21 +15,26 @@ package object api {
   //type Action[+A, -I <: IsolationLevel] = ActionT[Id,A,I]
   //type ActionFailure[+A] = Disjunction[ActionFailure, A]
   //type ActionResult[+A, -I <: IsolationLevel] = ActionT[ActionFailure, Revisioned[A], I]
-  type ApiAction[+A, -I <: IsolationLevel] = ActionT[PossibleActionFailure,A,I]
-  type ApiUpdateAction[+A] = ActionT[PossibleActionFailure,A,TransactionRepeatableRead]
-  type ApiReadAction[+A] = ActionT[PossibleActionFailure,A,TransactionReadCommitted]
+  type ApiAction[+A, -I <: IsolationLevel] = ActionT[PossibleActionFailure,A,I,List[ActionEvent]]
+  type ApiUpdateAction[+A] = ActionT[PossibleActionFailure,A,TransactionRepeatableRead,List[ActionEvent]]
+  type ApiReadAction[+A] = ActionT[PossibleActionFailure,A,TransactionReadCommitted,List[ActionEvent]]
   type PossibleActionFailure[+A] = \/[ActionFailure, A]
 
   object ApiAction {
-    def apply[A, I <: IsolationLevel](a: DbSession[I] => \/[ActionFailure, A]) = ActionT[PossibleActionFailure,A,I](a)
+    def apply[A, I <: IsolationLevel](a: DbSession[I] => \/[ActionFailure, (List[ActionEvent], A)]) = ActionT[PossibleActionFailure,A,I,List[ActionEvent]](a)
   }
 
   object ApiUpdateAction {
-    def apply[A](a: DbSession[TransactionRepeatableRead] => \/[ActionFailure, A]) = ActionT[PossibleActionFailure,A,TransactionRepeatableRead](a)
+    def apply[A](a: DbSession[TransactionRepeatableRead] => \/[ActionFailure, (List[ActionEvent], A)]) = ActionT[PossibleActionFailure,A,TransactionRepeatableRead, List[ActionEvent]](a)
   }
 
   object ApiReadAction {
-    def apply[A](a: DbSession[TransactionReadCommitted] => \/[ActionFailure, A]) = ActionT[PossibleActionFailure,A,TransactionReadCommitted](a)
+    def apply[A](a: DbSession[TransactionReadCommitted] => \/[ActionFailure, A]) =
+      ActionT[PossibleActionFailure,A,TransactionReadCommitted,List[ActionEvent]] { s => a(s) fold (
+        error => error.left,
+        success => (Nil, success).right
+      )
+      }
 
     def pure[A](v: => \/[ActionFailure, A]) = ApiReadAction(s => v)
   }
