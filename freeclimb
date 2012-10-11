@@ -1,0 +1,57 @@
+#!/bin/bash
+
+__FREECLIMB_USAGE="
+Usage:
+    freeclimb (postgres|solr) (start|stop|restart)
+"
+
+freeclimb () {
+    case "$1" in
+        postgres)   __postgres ${@:2} ;;
+        solr)       __solr ${@:2} ;;
+        *)          echo "$__FREECLIMB_USAGE"
+    esac
+}
+
+__postgres () {
+    case "$1" in
+        start)      __postgres_start ;;
+        stop)       __postgres_stop ;;
+        restart)    __postgres_start ; __postgres_stop ;;
+        *)          echo "$__FREECLIMB_USAGE"
+    esac
+}
+
+__solr () {
+    case "$1" in
+        start)      __solr_start ;;
+        stop)       __solr_stop ;;
+        restart)    __solr_start ; __solr_stop ;;
+        *)          echo "$__FREECLIMB_USAGE"
+    esac
+}
+
+__postgres_start () {
+    sudo chmod 775 /var/run/postgresql
+    pg_ctl -D ./freeclimb-dev.pg start &
+}
+
+__postgres_stop () {
+	pg_ctl -D ./freeclimb-dev.pg stop
+}
+
+__solr_start () {
+    SCHEMA=solr-server/solr/example/solr/collection1/conf/schema.xml
+    rm "$SCHEMA"
+    ln -s "$PWD/src/main/resources/solr/schema/schema-0.1.xml" "$SCHEMA"
+    cd solr-server/solr/example
+    java -jar start.jar > /dev/null &
+    echo $! > .solr.pid
+    cd -
+}
+
+__solr_stop () {
+    SOLR_PID=`cat solr-server/solr/example/.solr.pid`
+    kill "$SOLR_PID"
+}
+
