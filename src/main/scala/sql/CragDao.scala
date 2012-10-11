@@ -21,12 +21,42 @@ object CragDao extends CragDao
  *
  * Defines lower-level domai-model access for Crags.  Mostly CRUD.
  */
-trait CragDao extends Repository[Crag] {
+trait CragDao extends Repository[Crag]
+                 with Dao {
+
+  //override def create(crag: Crag) = ApiAction { session =>
+  //  implicit val connection = session.dbConnection
+
+  //  try{
+
+  //    val nextRevision: Long = SQL("SELECT nextval('revision_seq');").as(scalar[Long].single)
+
+  //    SQL(
+  //      """
+  //      INSERT INTO crags(name, title, revision)
+  //        VALUES ({name}, {title}, {revision});
+  //      """
+  //    ).on("name"     -> crag.name,
+  //         "title"    -> crag.title,
+  //         "revision" -> nextRevision
+  //    ).executeInsert()
+
+  //    created(crag, nextRevision).right
+
+  //  } catch {
+  //    case e: SQLException => e.sqlError match {
+  //      case Some(UniqueViolation) => EditConflict().left
+  //      case _                     => throw e
+  //    }
+  //    case e => throw e
+  //  }
+
+  //}
 
   override def create(crag: Crag) = ApiAction { session =>
     implicit val connection = session.dbConnection
 
-    try{
+    trySql {
 
       val nextRevision: Long = SQL("SELECT nextval('revision_seq');").as(scalar[Long].single)
 
@@ -42,12 +72,8 @@ trait CragDao extends Repository[Crag] {
 
       created(crag, nextRevision).right
 
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(UniqueViolation) => EditConflict().left
-        case _                     => throw e
-      }
-      case e => throw e
+    } catchSqlState {
+      case UniqueViolation => EditConflict()
     }
 
   }
@@ -55,7 +81,7 @@ trait CragDao extends Repository[Crag] {
   override def delete(cragRev: Revisioned[Crag]) = ApiAction { session =>
 
     implicit val connection = session.dbConnection
-    try {
+    trySql {
 
       get(cragRev.model.name).runWith(session).fold (
         error => error.left,
@@ -74,20 +100,16 @@ trait CragDao extends Repository[Crag] {
             deleted(cragRev).right
         }
       )
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) =>  EditConflict().left
-        case Some(ForeignKeyViolation)  =>  ValidationError().left
-        case _                          =>  throw e
-      }
-      case e                            =>  throw e
+    } catchSqlState {
+      case SerializationFailure =>  EditConflict()
+      case ForeignKeyViolation  =>  ValidationError()
     }
   }
 
   override def purge(cragRev: Revisioned[Crag]) = ApiAction { session =>
 
     implicit val connection = session.dbConnection
-    try {
+    trySql {
 
       get(cragRev.model.name).runWith(session).fold (
         error => error.left,
@@ -119,19 +141,15 @@ trait CragDao extends Repository[Crag] {
             purged(cragRev).right
         }
       )
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) =>  EditConflict().left
-        case Some(ForeignKeyViolation)  =>  ValidationError().left
-        case _                          =>  throw e
-      }
-      case e                            =>  throw e
+    } catchSqlState {
+        case SerializationFailure =>  EditConflict()
+        case ForeignKeyViolation  =>  ValidationError()
     }
   }
 
   override def update(cragRev: Revisioned[Crag]) = ApiAction { session =>
     implicit val connection = session.dbConnection
-    try {
+    trySql {
 
       get(cragRev.model.name).runWith(session) fold (
         error => error.left,
@@ -156,12 +174,8 @@ trait CragDao extends Repository[Crag] {
             updated(crag, nextRevision).right
         }
       )
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) =>  EditConflict().left
-        case _                          =>  throw e
-      }
-      case e                            =>  throw e
+    } catchSqlState {
+        case SerializationFailure =>  EditConflict()
     }
 
   }
@@ -184,7 +198,7 @@ trait CragDao extends Repository[Crag] {
       """
     ).on(
       "name" -> name
-    ).as(revisionedCrag.singleOpt).right
+    ).as(revisionedCrag("crags").singleOpt).right
   }
 
   def history(crag: Crag): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
@@ -198,7 +212,7 @@ trait CragDao extends Repository[Crag] {
       """
     ).on(
       "name" -> crag.name
-    ).as(revisionedCrag *).right
+    ).as(revisionedCrag("crag_history") *).right
   }
 
   def deletedList(): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
@@ -211,20 +225,7 @@ trait CragDao extends Repository[Crag] {
         WHERE c.id IS NULL
         ORDER BY h.crag_id, h.revision DESC
       """
-    ).as(revisionedCrag *).right
-  }
-
-  private val crag = {
-    str("name") ~
-    str("title") map {
-      case name~title => Crag.makeUnsafe(name, title)
-    }
-  }
-
-  private val revisionedCrag = {
-    crag ~ int("revision") map {
-      case crag~revision => Revisioned[Crag](revision, crag)
-    }
+    ).as(revisionedCrag("crag_history") *).right
   }
 
   private def created(crag: Crag, revision: Long) = {

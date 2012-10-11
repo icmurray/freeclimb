@@ -21,7 +21,8 @@ import freeclimb.sql.SqlError._
  */
 object ClimbDao extends ClimbDao
 
-trait ClimbDao extends Repository[Climb] {
+trait ClimbDao extends Repository[Climb]
+                  with Dao {
 
   def get(crag: String, climb: String): ApiReadAction[Revisioned[Climb]] = for {
     optionRev <- getOption(crag, climb)
@@ -55,10 +56,10 @@ trait ClimbDao extends Repository[Climb] {
     ).as(revisionedClimb("climbs", "crags").singleOpt).right
   }
 
-  override def create(climb: Climb) = ApiAction { session =>
+  override def create(climb: Climb) = ApiUpdateAction { session =>
     implicit val connection = session.dbConnection
 
-    try {
+    trySql {
       
       val nextRevision: Long = SQL("SELECT nextval('revision_seq');").as(scalar[Long].single)
 
@@ -91,19 +92,15 @@ trait ClimbDao extends Repository[Climb] {
       ).executeInsert()
 
       created(climb, nextRevision).right
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(UniqueViolation)  => EditConflict().left
-        case Some(NotNullViolation) => ValidationError().left
-        case _                      => throw e
-      }
-      case e => throw e
+    } catchSqlState {
+        case UniqueViolation  => EditConflict()
+        case NotNullViolation => ValidationError()
     }
   }
 
   override def update(climbRev: Revisioned[Climb]) = ApiAction { session =>
     implicit val connection = session.dbConnection
-    try {
+    trySql {
 
       get(climbRev.model.crag.name, climbRev.model.name).runWith(session) fold (
         error => error.left,
@@ -139,20 +136,16 @@ trait ClimbDao extends Repository[Climb] {
             updated(climb, nextRevision).right
         }
       )
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) =>  EditConflict().left
-        case _                          =>  throw e
-      }
-      case e                            =>  throw e
+    } catchSqlState {
+        case SerializationFailure =>  EditConflict()
     }
 
   }
 
   override def delete(climbRev: Revisioned[Climb]) = ApiAction { session =>
     implicit val connection = session.dbConnection
-    try {
 
+    trySql {
       get(climbRev.model.crag.name, climbRev.model.name).runWith(session).fold (
         error => error.left,
         currentRevision => currentRevision match {
@@ -173,18 +166,14 @@ trait ClimbDao extends Repository[Climb] {
             deleted(climbRev).right
         }
       )
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) =>  EditConflict().left
-        case _                          =>  throw e
-      }
-      case e                            =>  throw e
+    } catchSqlState {
+        case SerializationFailure =>  EditConflict()
     }
   }
 
   override def purge(climbRev: Revisioned[Climb]) = ApiAction { session =>
     implicit val connection = session.dbConnection
-    try {
+    trySql {
 
       get(climbRev.model.crag.name, climbRev.model.name).runWith(session).fold (
         error => error.left,
@@ -216,12 +205,8 @@ trait ClimbDao extends Repository[Climb] {
             purged(climbRev).right
         }
       )
-    } catch {
-      case e: SQLException => e.sqlError match {
-        case Some(SerializationFailure) =>  EditConflict().left
-        case _                          =>  throw e
-      }
-      case e                            =>  throw e
+    } catchSqlState {
+        case SerializationFailure =>  EditConflict()
     }
   }
 
@@ -323,41 +308,6 @@ trait ClimbDao extends Repository[Climb] {
       "crag_name" -> crag.model.name,
       "latest_revision" -> crag.revision
     ).as(revisionedClimb("climb_history", "crags") *).right
-  }
-
-  private def climb(climbTable: String, cragTable: String) = {
-    grade ~
-    crag(cragTable) ~
-    str(climbTable + ".name") ~
-    str(climbTable + ".title") ~
-    str(climbTable + ".description") map {
-      case grade~crag~name~title~description => Climb.makeUnsafe(
-        name,
-        title,
-        description,
-        crag,
-        grade
-      )
-    }
-  }
-
-  private lazy val grade = {
-    str("grading_system") ~ int("difficulty") map { case system~difficulty =>
-      Grade(system, difficulty)
-    }
-  }
-
-  private def crag(table: String) = {
-    str(table + ".name") ~
-    str(table + ".title") map {
-      case name~title => Crag.makeUnsafe(name, title)
-    }
-  }
-
-  private def revisionedClimb(climbTable: String, cragTable: String) = {
-    climb(climbTable, cragTable) ~ int(climbTable + ".revision") map {
-      case climb~revision => Revisioned[Climb](revision, climb)
-    }
   }
 
   private def created(climb: Climb, revision: Long) = {
