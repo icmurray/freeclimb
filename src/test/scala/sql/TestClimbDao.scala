@@ -43,7 +43,7 @@ class ClimbDaoTest extends FunSpec
 
   private def newSession() = TestDatabaseSessions.newSession(TransactionRepeatableRead)
   private def run[M[+_], A](action: ApiAction[A, TransactionRepeatableRead]) = {
-    action.runInTransaction(newSession())
+    DefaultActionRunner.runInTransaction(newSession())(action)
   }
 
   describe("Climb DAO") {

@@ -41,7 +41,7 @@ class CragDaoTest extends FunSpec
 
   private def newSession() = TestDatabaseSessions.newSession(TransactionRepeatableRead)
   private def run[M[+_], A](action: ApiAction[A, TransactionRepeatableRead]) = {
-    action.runInTransaction(newSession())
+    DefaultActionRunner.runInTransaction(newSession())(action)
   }
 
   describe("Crag DAO") {
@@ -165,7 +165,8 @@ class CragDaoTest extends FunSpec
 
         // The new Crag is created within a new Thread
         val f = future {
-          cragDao.create(newBurbage).runInTransaction(session2)
+          val action = cragDao.create(newBurbage)
+          DefaultActionRunner.runInTransaction(session2)(action)
         }
 
         // *try* to ensure the second transaction has started concurrently
@@ -248,7 +249,8 @@ class CragDaoTest extends FunSpec
         // The new Crag is updated within a new Thread
         val update2 = Revisioned[Crag](newCrag.revision, newestBurbage)
         val f = future {
-          cragDao.update(update2).runInTransaction(session2)
+          val action = cragDao.update(update2)
+          DefaultActionRunner.runInTransaction(session2)(action)
         }
 
         // *try* to ensure the second transaction has started concurrently

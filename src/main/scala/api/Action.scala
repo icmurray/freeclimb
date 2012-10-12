@@ -6,35 +6,12 @@ import Scalaz._
 import freeclimb.models._
 import freeclimb.sql.IsolationLevel
 
-case class ActionT[M[+_], +A, -I <: IsolationLevel, W <: List[ActionEvent]](g: DbSession[I] => M[(W, A)]) {
+case class ActionT[M[+_], +A, -I <: IsolationLevel, W](g: DbSession[I] => M[(W, A)]) {
 
   def apply(s: DbSession[I]) = g(s)
 
   /** Synonym for apply() */
   def runWith(s: DbSession[I]) = apply(s)
-
-  /** Run the action in a transaction. */
-   def runInTransaction(s: DbSession[I])(implicit F: Failable[M[_]], M: Functor[M]) = {
-    val connection = s.dbConnection
-    try {
-      connection.setAutoCommit(false)
-      connection.setTransactionIsolation(s.jdbcLevel)
-      val result = g(s)
-      if (F.isFailure(result)) {
-        connection.rollback()
-      } else {
-        connection.commit()
-      }
-
-      // discard the ActionEvent log from the results
-      M.map(result) { case (w,a) => a }
-    } catch {
-      case e => connection.rollback() ; throw e
-    } finally {
-      connection.setAutoCommit(true)
-      connection.close()
-    }
-  }
 
   def map[B](f: A => B)(implicit F: Functor[M]): ActionT[M,B,I,W] = ActionT[M,B,I,W]{ s =>
     F.map(g(s)) {

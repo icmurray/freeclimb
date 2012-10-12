@@ -44,11 +44,11 @@ trait CrudApi {
 
   // This *runs* an action at the correction islation level
   def runCreateUpdateThenGet(climb: Climb)(session: DbSession[TransactionSerializable]) = {
-    createUpdateThenGet(climb).runInTransaction(session)
+    DefaultActionRunner.runInTransaction(session)(createUpdateThenGet(climb))
   }
 
   def runRead(climb: Climb)(session: DbSession[TransactionReadCommitted]) = {
-    getClimb(climb.crag.name, climb.name).runInTransaction(session)
+    DefaultActionRunner.runInTransaction(session)(getClimb(climb.crag.name, climb.name))
   }
 
   // This *runs* acn action at the wrong isolation level
