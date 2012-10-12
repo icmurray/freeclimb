@@ -3,5 +3,5 @@ target/
 *.swp
 
 # Dev database.
-freeclimb-dev.pg
+*.pg
 solr-server
