@@ -12,9 +12,6 @@ package object api {
   /**
    * Some type synonyms to help tidy the function signatures.
    */
-  //type Action[+A, -I <: IsolationLevel] = ActionT[Id,A,I]
-  //type ActionFailure[+A] = Disjunction[ActionFailure, A]
-  //type ActionResult[+A, -I <: IsolationLevel] = ActionT[ActionFailure, Revisioned[A], I]
   type ApiAction[+A, -I <: IsolationLevel] = ActionT[PossibleActionFailure,A,I,List[ActionEvent]]
   type ApiUpdateAction[+A] = ActionT[PossibleActionFailure,A,TransactionRepeatableRead,List[ActionEvent]]
   type ApiReadAction[+A] = ActionT[PossibleActionFailure,A,TransactionReadCommitted,List[ActionEvent]]
