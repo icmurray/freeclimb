@@ -8,22 +8,23 @@ import spray.json.DefaultJsonProtocol._
 
 import freeclimb.models._
 
-trait ClimbLinks {
-  def climb: Climb
-
-  lazy val links = Map("self" -> Link.get(climb))
+object ClimbResource extends ClimbResourceJsonFormats {
+  def apply(c: Climb): Resource[Climb] = new Resource[Climb] with ClimbRelations {
+    override lazy val climb = c
+    override lazy val resource = climb
+  }
 }
 
-case class ClimbResource(val climb: Climb) extends Resource[Climb] with ClimbLinks {
-  lazy val resource = climb
-}
-case class RevisionedClimbResource(revision: Revisioned[Climb]) extends Resource[Revisioned[Climb]] with ClimbLinks {
-  lazy val climb = revision.model
-  lazy val resource = revision
-}
+object RevisionedClimbResource extends ClimbResourceJsonFormats {
 
-object ClimbResource extends ClimbResourceJsonFormats
-object RevisionedClimbResource extends ClimbResourceJsonFormats
+  // Locally used type synonym for brevity
+  private type RRClimb = Resource[Revisioned[Climb]]
+
+  def apply(revision: Revisioned[Climb]): RRClimb = new RRClimb with ClimbRelations {
+     override lazy val climb = revision.model
+     override lazy val resource = revision
+  }
+}
 
 trait ClimbResourceJsonFormats extends ResourceJsonFormats {
 
@@ -36,32 +37,20 @@ trait ClimbResourceJsonFormats extends ResourceJsonFormats {
     ).toJson
     
     def read(value: JsValue) = value match {
-      case _ => deserializationError("Climb Expected")
+      case _ => deserializationError("Not implemented: ClimbJsonFormat.read()")
     }
   }
-
-  //implicit object ClimbResourceJsonFormat extends RootJsonWriter[ClimbResource] {
-  //  def write(resource: ClimbResource) = {
-  //    import CragResource._
-  //    val resourceJson = resource.climb.toJson.asJsObject
-  //    val linksJson = JsObject("_links" -> resource.links.toJson)
-  //    val crag = CragResource(resource.climb.crag).toJson
-  //    val embeddedJson = JsObject("_embedded" -> crag)
-
-  //    resourceJson |+| linksJson |+| embeddedJson
-  //  }
-  //}
-  //
-  //implicit object RevisionedClimbResourceJsonFormat extends RootJsonWriter[RevisionedClimbResource] {
-  //  def write(resource: RevisionedClimbResource) = {
-  //    import RevisionedCragResource._
-  //    val resourceJson = resource.revision.toJson.asJsObject
-  //    val linksJson = JsObject("_links" -> resource.links.toJson)
-  //    val crag = CragResource(resource.climb.crag).toJson
-  //    val embeddedJson = JsObject("_embedded" -> crag)
-
-  //    resourceJson |+| linksJson |+| embeddedJson
-  //  }
-  //}
 }
 
+private trait ClimbRelations {
+  import CragResource._
+  def climb: Climb
+
+  lazy val links = Map(
+    "self" -> Link.get(climb)
+  )
+
+  lazy val embedded = Map(
+    "climbs" -> CragResource(climb.crag).toJson
+  )
+}

@@ -8,26 +8,23 @@ import spray.json.DefaultJsonProtocol._
 
 import freeclimb.models._
 
-trait CragLinks {
-
-  def crag: Crag
-
-  lazy val links = Map(
-    "self"   -> Link.get(crag),
-    "climbs" -> Link.climbs(crag)
-  )
+object CragResource extends CragResourceJsonFormats {
+  def apply(c: Crag): Resource[Crag] = new Resource[Crag] with CragRelations {
+    override lazy val crag = c
+    override lazy val resource = crag
+  }
 }
 
-case class CragResource(val crag: Crag) extends Resource[Crag] with CragLinks {
-  lazy val resource = crag
-}
-case class RevisionedCragResource(revision: Revisioned[Crag]) extends Resource[Revisioned[Crag]] with CragLinks {
-  lazy val crag = revision.model
-  lazy val resource = revision
-}
+object RevisionedCragResource extends CragResourceJsonFormats {
 
-object CragResource extends CragResourceJsonFormats
-object RevisionedCragResource extends CragResourceJsonFormats
+  // Locally used type synonym for brevity
+  private type RRCrag = Resource[Revisioned[Crag]]
+
+  def apply(revision: Revisioned[Crag]): RRCrag = new RRCrag with CragRelations {
+    override lazy val crag = revision.model
+    override lazy val resource = revision
+  }
+}
 
 trait CragResourceJsonFormats extends ResourceJsonFormats {
 
@@ -38,19 +35,19 @@ trait CragResourceJsonFormats extends ResourceJsonFormats {
     ).toJson
     
     def read(value: JsValue) = value match {
-      case _ => deserializationError("Crag Expected")
+      case _ => deserializationError("Not implemented: CragJsonFormat.read()")
     }
   }
-
-  //implicit object CragResourceJsonFormat extends RootJsonWriter[CragResource] {
-  //  def write(resource: CragResource) = {
-  //    resource.crag.toJson.asJsObject |+| JsObject("_links" -> resource.links.toJson)
-  //  }
-  //}
-
-  //implicit object RevisionedCragResourceJsonFormat extends RootJsonWriter[RevisionedCragResource] {
-  //  def write(resource: RevisionedCragResource) = {
-  //    resource.revision.toJson.asJsObject |+| JsObject("_links" -> resource.links.toJson)
-  //  }
-  //}
 }
+
+private trait CragRelations {
+  def crag: Crag
+
+  lazy val links = Map(
+    "self"   -> Link.get(crag),
+    "climbs" -> Link.climbs(crag)
+  )
+  
+  lazy val embedded = Map[String, JsValue]()
+}
+

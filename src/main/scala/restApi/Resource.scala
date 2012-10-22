@@ -12,6 +12,7 @@ import freeclimb.models._
 trait Resource[T] {
   def resource: T
   def links: Map[String, Link]
+  def embedded: Map[String, JsValue]
 }
 
 trait ResourceJsonFormats extends JsInstances {
@@ -31,7 +32,8 @@ trait ResourceJsonFormats extends JsInstances {
     def write(resource: Resource[T]) = {
       val resourceJson = implicitly[RootJsonWriter[T]].write(resource.resource).asJsObject
       val linksJson = JsObject("_links" -> resource.links.toJson)
-      resourceJson |+| linksJson
+      val embedJson = JsObject("_embedded" -> resource.embedded.toJson)
+      resourceJson |+| linksJson |+| embedJson
     }
   }
 
