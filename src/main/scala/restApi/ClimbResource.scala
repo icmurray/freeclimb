@@ -28,18 +28,31 @@ object RevisionedClimbResource extends ClimbResourceJsonFormats {
 
 trait ClimbResourceJsonFormats extends ResourceJsonFormats {
 
+  implicit object GradeJsonFormat extends RootJsonFormat[Grade] {
+    def write(grade: Grade) = Map(
+      "system"     -> grade.system.toString,
+      "difficulty" -> grade.toString
+    ).toJson
+
+    def read(value: JsValue) = value match {
+      case _ => deserializationError("Not implemented: GradeJsonFormat.read()")
+    }
+
+  }
+
   implicit object ClimbJsonFormat extends RootJsonFormat[Climb] {
     def write(climb: Climb) = Map(
-      "name"        -> climb.name,
-      "title"       -> climb.title,
-      "description" -> climb.description,
-      "grade"       -> climb.grade.toString   // TODO: JsonFormat for Grade
+      "name"        -> climb.name.toJson,
+      "title"       -> climb.title.toJson,
+      "description" -> climb.description.toJson,
+      "grade"       -> climb.grade.toJson
     ).toJson
     
     def read(value: JsValue) = value match {
       case _ => deserializationError("Not implemented: ClimbJsonFormat.read()")
     }
   }
+  
 }
 
 private trait ClimbRelations {
