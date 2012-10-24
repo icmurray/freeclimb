@@ -16,22 +16,20 @@ object ModelJson extends CragJson
 trait CragJson {
   import JsonInstances._
 
-  implicit object CragJsonWriter extends RootJsonWriter[Crag] {
-    def write(crag: Crag) = {
-      cragRepresentation(crag) |+| links(crag) |+| embedded(crag)
-    }
+  implicit object CragJsonWriter extends RootJsonWriter[Crag]
+                                    with HalJson[Crag] {
 
-    private def cragRepresentation(crag: Crag) = Map(
+    override protected def modelRepr(crag: Crag) = Map(
       "name"  -> crag.name,
       "title" -> crag.title
     ).toJson.asJsObject
 
-    private def links(crag: Crag) = JsObject("_links" -> Map(
+    override protected def links(crag: Crag) = Map(
       "self"   -> Link.get(crag),
       "climbs" -> Link.climbs(crag)
-    ).toJson.asJsObject)
+    ).toJson.asJsObject
 
-    private def embedded(crag: Crag) = Map[String, JsValue]().toJson.asJsObject
+    override protected def embedded(crag: Crag) = Map[String, JsValue]().toJson.asJsObject
 
   }
 }
@@ -47,31 +45,39 @@ trait ClimbJson { self: CragJson =>
 
   }
 
-  implicit object ClimbJsonWriter extends RootJsonWriter[Climb] {
-    def write(climb: Climb) = {
-      climbRepresentation(climb) |+| links(climb) |+| embedded(climb)
-    }
+  implicit object ClimbJsonWriter extends RootJsonWriter[Climb]
+                                     with HalJson[Climb]{
 
-    def climbRepresentation(climb: Climb) = Map(
+    override protected def modelRepr(climb: Climb) = Map(
       "name"        -> climb.name.toJson,
       "title"       -> climb.title.toJson,
       "description" -> climb.description.toJson,
       "grade"       -> climb.grade.toJson
     ).toJson.asJsObject
 
-    private def links(climb: Climb) = JsObject("_links" -> Map(
+    override protected def links(climb: Climb) = Map(
       "self"   -> Link.get(climb)
-    ).toJson.asJsObject)
+    ).toJson.asJsObject
 
-    private def embedded(climb: Climb) = JsObject(
-      "_embedded" -> crag(climb)
-    )
-
-    private def crag(climb: Climb) = Map(
+    override protected def embedded(climb: Climb) = Map(
       "crag" -> climb.crag.toJson
     ).toJson.asJsObject
 
   }
+}
+
+trait HalJson[T] {
+
+  import JsonInstances._
+
+  def write(t: T) = modelRepr(t) |+| linksRepr(t) |+| embeddedRepr(t)
+
+  protected def linksRepr(t: T) = JsObject("_links" -> links(t))
+  protected def embeddedRepr(t: T) = JsObject("_embedded" -> embedded(t))
+
+  protected def modelRepr(t: T): JsObject
+  protected def links(t: T): JsObject
+  protected def embedded(t: T): JsObject
 }
 
 trait RevisionedJson {
