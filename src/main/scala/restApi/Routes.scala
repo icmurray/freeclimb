@@ -15,7 +15,8 @@ trait Routes extends HttpService {
 
   private val modelMarshaller = new BasicModelMarshallers(true)
   protected val api: CrudApi
-  protected val source: DataSource
+  implicit protected val source: DataSource
+  implicit protected val runner: ActionRunner
 
   lazy val routes = {
     import modelMarshaller._
@@ -42,32 +43,6 @@ trait Routes extends HttpService {
     case EditConflict()    => HttpResponse(StatusCodes.Conflict)
     case NotFound()        => HttpResponse(StatusCodes.NotFound)
     case NotImplemented()  => HttpResponse(StatusCodes.NotImplemented)
-  }
-
-  private def runRead[A](action: => ApiReadAction[A]) = {
-    NotifyingActionRunner.runInTransaction(newReadSession)(action)
-  }
-
-  private def newReadSession = new DbSession[TransactionReadCommitted] {
-    override lazy val dbConnection = {
-      val c = source.getConnection()
-      c.setAutoCommit(false)
-      c.setTransactionIsolation(TransactionReadCommitted.jdbcLevel)
-      c
-    }
-  }
-
-  private def runUpdate[A](action: => ApiUpdateAction[A]) = {
-    NotifyingActionRunner.runInTransaction(newUpdateSession)(action)
-  }
-
-  private def newUpdateSession = new DbSession[TransactionRepeatableRead] {
-    override lazy val dbConnection = {
-      val c = source.getConnection()
-      c.setAutoCommit(false)
-      c.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
-      c
-    }
   }
 
   private lazy val slug = "[a-zA-Z0-9_-]+".r

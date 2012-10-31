@@ -16,6 +16,7 @@ import freeclimb.models._
 class ServiceActor(override val source: DataSource) extends Actor with Routes {
 
   override protected val api = CrudApi
+  override protected val runner = NotifyingActionRunner
 
   def actorRefFactory = context
   def receive = runRoute(routes)
