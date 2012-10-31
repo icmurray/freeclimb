@@ -16,8 +16,6 @@ trait ActionRunner {
   def runInTransaction[M[+_],A,I <: IsolationLevel, W <: List[ActionEvent]](s: DbSession[I])(action: ActionT[M,A,I,W])(implicit F: Failable[M[_]], M: Functor[M]): M[A] = {
     val connection = s.dbConnection
     try {
-      connection.setAutoCommit(false)
-      connection.setTransactionIsolation(s.jdbcLevel)
       val result = action(s)
       if (F.isFailure(result)) {
         connection.rollback()
@@ -33,7 +31,6 @@ trait ActionRunner {
     } catch {
       case e => connection.rollback() ; throw e
     } finally {
-      connection.setAutoCommit(true)
       connection.close()
     }
   }

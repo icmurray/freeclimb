@@ -21,8 +21,12 @@ object TestDatabaseSessions {
   freeclimb.sql.performMigrations(source)
 
   def newSession[I <: IsolationLevel](isolationLevel: I) = new DbSession[I] {
-    override val dbConnection = source.getConnection()
-    override val level = isolationLevel
+    override lazy val dbConnection = {
+      val c = source.getConnection()
+      c.setAutoCommit(false)
+      c.setTransactionIsolation(isolationLevel.jdbcLevel)
+      c
+    }
   }
 
   def newSession(): DbSession[TransactionReadCommitted] = newSession(TransactionReadCommitted)

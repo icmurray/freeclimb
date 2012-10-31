@@ -28,6 +28,7 @@ class CragDaoTest extends FunSpec
                                                    dbConnection
     SQL("DELETE FROM crags;").execute()
     SQL("DELETE FROM crag_history;").execute()
+    connection.commit()
     connection.close()
   }
 

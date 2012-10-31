@@ -49,8 +49,12 @@ trait Routes extends HttpService {
   }
 
   private def newReadSession = new DbSession[TransactionReadCommitted] {
-    override val dbConnection = source.getConnection()
-    override val level = TransactionReadCommitted
+    override lazy val dbConnection = {
+      val c = source.getConnection()
+      c.setAutoCommit(false)
+      c.setTransactionIsolation(TransactionReadCommitted.jdbcLevel)
+      c
+    }
   }
 
   private def runUpdate[A](action: => ApiUpdateAction[A]) = {
@@ -58,8 +62,12 @@ trait Routes extends HttpService {
   }
 
   private def newUpdateSession = new DbSession[TransactionRepeatableRead] {
-    override val dbConnection = source.getConnection()
-    override val level = TransactionRepeatableRead
+    override lazy val dbConnection = {
+      val c = source.getConnection()
+      c.setAutoCommit(false)
+      c.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
+      c
+    }
   }
 
   private lazy val slug = "[a-zA-Z0-9_-]+".r

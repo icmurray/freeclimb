@@ -30,6 +30,7 @@ class ClimbDaoTest extends FunSpec
     SQL("DELETE FROM climb_history;").execute()
     SQL("DELETE FROM crags;").execute()
     SQL("DELETE FROM crag_history;").execute()
+    connection.commit()
     connection.close()
   }
 
