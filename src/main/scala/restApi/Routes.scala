@@ -1,36 +1,66 @@
 package freeclimb.restApi
 
+import javax.sql.DataSource
+
 import spray.json._
 import spray.routing._
 import spray.http._
 import spray.httpx.marshalling._
 
+import freeclimb.api._
 import freeclimb.models._
+import freeclimb.sql._
 
 trait Routes extends HttpService {
 
   private val modelMarshaller = new BasicModelMarshallers(true)
+  protected val api: CrudApi
+  protected val source: DataSource
 
   lazy val routes = {
     import modelMarshaller._
     path("crags" / slug / "climbs" / slug) { (cragName, climbName) =>
       get {
-        complete {
-          val crag = Crag.makeUnsafe(cragName, cragName)
-          val climb = Climb.makeUnsafe(climbName, climbName, "desc", crag, UkTrad(Grade.UkAdjective.E2, Grade.UkTechnical.T5c))
-          Revisioned[Climb](1L, climb)
-        }
+        runRead { api.getClimb(cragName, climbName) }.fold(
+          f       => complete(handleActionFailure(f)),
+          success => complete(success)
+        )
       }
     } ~
     path("crags" / slug) { cragName =>
       get {
-        complete {
-          Revisioned[Crag](1L, Crag.makeUnsafe(cragName, cragName))
-        }
+        runRead { api.getCrag(cragName) }.fold(
+          f       => complete(handleActionFailure(f)),
+          success => complete(success)
+        )
       }
     }
   }
 
+  private def handleActionFailure(f: ActionFailure) = f match {
+    case ValidationError() => HttpResponse(StatusCodes.BadRequest)
+    case EditConflict()    => HttpResponse(StatusCodes.Conflict)
+    case NotFound()        => HttpResponse(StatusCodes.NotFound)
+    case NotImplemented()  => HttpResponse(StatusCodes.NotImplemented)
+  }
+
+  private def runRead[A](action: => ApiReadAction[A]) = {
+    NotifyingActionRunner.runInTransaction(newReadSession)(action)
+  }
+
+  private def newReadSession = new DbSession[TransactionReadCommitted] {
+    override val dbConnection = source.getConnection()
+    override val level = TransactionReadCommitted
+  }
+
+  private def runUpdate[A](action: => ApiUpdateAction[A]) = {
+    NotifyingActionRunner.runInTransaction(newUpdateSession)(action)
+  }
+
+  private def newUpdateSession = new DbSession[TransactionRepeatableRead] {
+    override val dbConnection = source.getConnection()
+    override val level = TransactionRepeatableRead
+  }
 
   private lazy val slug = "[a-zA-Z0-9_-]+".r
 }

@@ -7,6 +7,11 @@ import freeclimb.sql._
 import scalaz._
 import Scalaz._
 
+object CrudApi extends CrudApi {
+  override val climbDao = ClimbDao
+  override val cragDao = CragDao
+}
+
 trait CrudApi {
 
   /**

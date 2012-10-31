@@ -9,18 +9,16 @@ import freeclimb.sql._
 
 object TestDatabaseSessions {
   Class.forName("org.postgresql.Driver")
+  
+  // TODO: move info configuration file
+  private val source = freeclimb.sql.createConnectionPool(
+      "localhost",
+      "freeclimb-test",
+      "freeclimb",
+      "testpassword",
+      10)
 
-  private val source = new PGPoolingDataSource();
-  source.setDataSourceName("Test datasource.")
-  source.setServerName("localhost");
-  source.setDatabaseName("freeclimb-test");
-  source.setUser("freeclimb");
-  source.setPassword("testpassword");
-  source.setMaxConnections(10);
-
-  private val flyway = new Flyway()
-  flyway.setDataSource(source)
-  flyway.migrate()
+  freeclimb.sql.performMigrations(source)
 
   def newSession[I <: IsolationLevel](isolationLevel: I) = new DbSession[I] {
     override val dbConnection = source.getConnection()

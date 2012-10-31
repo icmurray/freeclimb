@@ -1,9 +1,12 @@
 package freeclimb.restApi
 
 import spray.httpx.marshalling._
+import spray.http._
 import spray.http.MediaTypes._
+import spray.http.MediaRanges._
 import spray.json._
 
+import freeclimb.api._
 import freeclimb.models._
 import freeclimb.restApi.ModelJson._
 
@@ -15,7 +18,7 @@ trait ModelMarshallers {
 
   def printer: JsonPrinter
 
-  val `application/hal+json` = register(new ApplicationMediaType("hal+json", "json"))
+  val `application/hal+json` = MediaTypes.register(new ApplicationMediaType("hal+json", "json"))
 
   implicit val cragMarshaller = modelMarshaller[Crag]
   implicit val revisionedCragMarshaller = modelMarshaller[Revisioned[Crag]]
