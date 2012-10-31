@@ -14,26 +14,26 @@ resolvers += "Typesafe repository" at "http://repo.typesafe.com/typesafe/release
 // Repository for Spray libraries
 resolvers += "spray repo" at "http://repo.spray.io"
 
-libraryDependencies += "com.github.seratch" %% "scalikesolr" % "(3.6,)"
+libraryDependencies += "com.github.seratch" %% "scalikesolr" % "(3.6,)" withSources() withJavadoc()
 
-libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.0-M3"
+libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.0-M3" withSources() withJavadoc()
 
-libraryDependencies += "play" %% "anorm" % "2.1-09142012" withSources()
+libraryDependencies += "play" %% "anorm" % "2.1-09142012" withSources() withSources()
 
-libraryDependencies += "postgresql" % "postgresql" % "9.1-901-1.jdbc4"
+libraryDependencies += "postgresql" % "postgresql" % "9.1-901-1.jdbc4" withSources() withJavadoc()
 
-libraryDependencies += "com.googlecode.flyway" % "flyway-core" % "1.7"
+libraryDependencies += "com.googlecode.flyway" % "flyway-core" % "1.7" withSources() withJavadoc()
 
-libraryDependencies += "io.spray" % "spray-can" % "1.0-M3"
+libraryDependencies += "io.spray" % "spray-can" % "1.0-M3" withSources() withJavadoc()
 
-libraryDependencies += "io.spray" % "spray-routing" % "1.0-M3"
+libraryDependencies += "io.spray" % "spray-routing" % "1.0-M3" withSources() withJavadoc()
 
-libraryDependencies += "io.spray" %%  "spray-json" % "1.2.2"
+libraryDependencies += "io.spray" %%  "spray-json" % "1.2.2" withSources() withJavadoc()
 
-libraryDependencies += "com.typesafe.akka" % "akka-actor" % "2.0.3"
+libraryDependencies += "com.typesafe.akka" % "akka-actor" % "2.0.3" withSources() withJavadoc()
 
 // required by spray-routing
 scalacOptions += "-Ydependent-method-types"
 
 // Test deps
-libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test"
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test" withSources() withJavadoc()
