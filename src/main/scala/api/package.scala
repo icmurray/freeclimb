@@ -11,7 +11,7 @@ import freeclimb.sql._
 
 package object api {
   
-  def runRead[A](action: => ApiReadAction[A])(implicit runner: ActionRunner, source: DataSource) = {
+  def runRead[A](action: => ApiReadAction[A])(implicit source: DataSource, runner: ActionRunner = NotifyingActionRunner) = {
     runner.runInTransaction(newReadSession)(action)
   }
 
@@ -24,7 +24,7 @@ package object api {
     }
   }
 
-  def runUpdate[A](action: => ApiUpdateAction[A])(implicit runner: ActionRunner, source: DataSource) = {
+  def runUpdate[A](action: => ApiUpdateAction[A])(implicit source: DataSource, runner: ActionRunner = NotifyingActionRunner) = {
     runner.runInTransaction(newUpdateSession)(action)
   }
 

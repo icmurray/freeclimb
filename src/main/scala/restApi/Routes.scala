@@ -16,7 +16,6 @@ trait Routes extends HttpService {
   private val modelMarshaller = new BasicModelMarshallers(true)
   protected val api: CrudApi
   implicit protected val source: DataSource
-  implicit protected val runner: ActionRunner
 
   lazy val routes = {
     import modelMarshaller._
