@@ -15,13 +15,13 @@ trait Routes extends HttpService {
 
   private val modelMarshaller = new BasicModelMarshallers(true)
   protected val api: CrudApi
-  implicit protected val source: DataSource
+  protected def runner: ActionRunner
 
   lazy val routes = {
     import modelMarshaller._
     path("crags" / slug / "climbs" / slug) { (cragName, climbName) =>
       get {
-        runRead { api.getClimb(cragName, climbName) }.fold(
+        runner.run { api.getClimb(cragName, climbName) }.fold(
           f       => complete(handleActionFailure(f)),
           success => complete(success)
         )
@@ -29,7 +29,7 @@ trait Routes extends HttpService {
     } ~
     path("crags" / slug) { cragName =>
       get {
-        runRead { api.getCrag(cragName) }.fold(
+        runner.run { api.getCrag(cragName) }.fold(
           f       => complete(handleActionFailure(f)),
           success => complete(success)
         )

@@ -13,7 +13,7 @@ import spray.httpx.SprayJsonSupport._
 import freeclimb.api._
 import freeclimb.models._
 
-class ServiceActor(override val source: DataSource) extends Actor with Routes {
+class ServiceActor(override val runner: ActionRunner) extends Actor with Routes {
 
   override protected val api = CrudApi
 

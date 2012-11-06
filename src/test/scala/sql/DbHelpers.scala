@@ -11,7 +11,7 @@ object TestDatabaseSessions {
   Class.forName("org.postgresql.Driver")
   
   // TODO: move info configuration file
-  private val source = freeclimb.sql.createConnectionPool(
+  val source = freeclimb.sql.createConnectionPool(
       "localhost",
       "freeclimb-test",
       "freeclimb",
@@ -20,14 +20,11 @@ object TestDatabaseSessions {
 
   freeclimb.sql.performMigrations(source)
 
-  def newSession[I <: IsolationLevel](isolationLevel: I) = new DbSession[I] {
-    override lazy val dbConnection = {
-      val c = source.getConnection()
-      c.setAutoCommit(false)
-      c.setTransactionIsolation(isolationLevel.jdbcLevel)
-      c
-    }
+  def newConnection(level: IsolationLevel) = {
+    val c = source.getConnection()
+    c.setAutoCommit(false)
+    c.setTransactionIsolation(level.jdbcLevel)
+    c
   }
 
-  def newSession(): DbSession[TransactionReadCommitted] = newSession(TransactionReadCommitted)
 }

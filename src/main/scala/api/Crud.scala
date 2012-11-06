@@ -47,26 +47,6 @@ trait CrudApi {
     result   <- climbDao.get(climb.crag.name, climb.name)
   } yield result
 
-  // This *runs* an action at the correction islation level
-  def runCreateUpdateThenGet(climb: Climb)(session: DbSession[TransactionSerializable]) = {
-    DefaultActionRunner.runInTransaction(session)(createUpdateThenGet(climb))
-  }
-
-  def runRead(climb: Climb)(session: DbSession[TransactionReadCommitted]) = {
-    DefaultActionRunner.runInTransaction(session)(getClimb(climb.crag.name, climb.name))
-  }
-
-  // This *runs* acn action at the wrong isolation level
-  // It should *not* compile
-  //def runCreateUpdateThenGet(climb: Climb)(session: DbSession[TransactionReadCommitted]) = {
-  //  createUpdateThenGet(climb).runInTransaction(session)
-  //}
-
-  // And when uncommented, this one shouldn't:
-  //def runCreateClimbShouldNotWork(climb: Climb)(session: DbSession[TransactionNone]): Disjunction[ActionFailure, Revisioned[Climb]] =
-  //  createClimb(climb).runInTransaction(session)
-
-
   /**
    * Crag related actions.  Again, these just pass straight through to the DAO
    * layer.

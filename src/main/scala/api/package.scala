@@ -11,32 +11,6 @@ import freeclimb.sql._
 
 package object api {
   
-  def runRead[A](action: => ApiReadAction[A])(implicit source: DataSource, runner: ActionRunner = NotifyingActionRunner) = {
-    runner.runInTransaction(newReadSession)(action)
-  }
-
-  private def newReadSession(implicit source: DataSource) = new DbSession[TransactionReadCommitted] {
-    override lazy val dbConnection = {
-      val c = source.getConnection()
-      c.setAutoCommit(false)
-      c.setTransactionIsolation(TransactionReadCommitted.jdbcLevel)
-      c
-    }
-  }
-
-  def runUpdate[A](action: => ApiUpdateAction[A])(implicit source: DataSource, runner: ActionRunner = NotifyingActionRunner) = {
-    runner.runInTransaction(newUpdateSession)(action)
-  }
-
-  private def newUpdateSession(implicit source: DataSource) = new DbSession[TransactionRepeatableRead] {
-    override lazy val dbConnection = {
-      val c = source.getConnection()
-      c.setAutoCommit(false)
-      c.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
-      c
-    }
-  }
-
   /**
    * Some type synonyms to help tidy the function signatures.
    */

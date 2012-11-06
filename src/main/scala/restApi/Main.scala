@@ -4,6 +4,7 @@ import akka.actor.{Props, ActorSystem}
 import spray.can.server.HttpServer
 import spray.io._
 
+import freeclimb.api.ActionRunner
 
 object Main extends App {
 
@@ -29,7 +30,8 @@ object Main extends App {
   val ioBridge = new IOBridge(system).start()
 
   // create and start our service actor
-  val service = system.actorOf(Props(new ServiceActor(connectionSource)), "request-handler")
+  val actionRunner = new ActionRunner(connectionSource)
+  val service = system.actorOf(Props(new ServiceActor(actionRunner)), "request-handler")
 
   // create and start the spray-can HttpServer, telling it that
   // we want requests to be handled by our singleton service actor

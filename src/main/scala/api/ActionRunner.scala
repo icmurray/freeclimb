@@ -1,22 +1,25 @@
 package freeclimb.api
 
+import javax.sql.DataSource
+
 import scalaz._
 import Scalaz._
 
 import freeclimb.sql.IsolationLevel
 
-object DefaultActionRunner extends ActionRunner
-                              with NoOpEventProcessor
+class ActionRunner(private val dataSource: DataSource) {
 
-object NotifyingActionRunner extends ActionRunner
-                                with SynchronousNotifications
+  // TODO: decide whether these should be callbacks, or some sort of Listener
+  private var callbacks: List[PartialFunction[ActionEvent, Unit]] = Nil
 
-trait ActionRunner {
-
-  def runInTransaction[M[+_],A,I <: IsolationLevel, W <: List[ActionEvent]](s: DbSession[I])(action: ActionT[M,A,I,W])(implicit F: Failable[M[_]], M: Functor[M]): M[A] = {
-    val connection = s.dbConnection
+  def run[M[+_],A,I <: IsolationLevel, W <: List[ActionEvent]](action: ActionT[M,A,I,W])(implicit F: Failable[M[_]], M: Functor[M], m: Manifest[I]): M[A] = {
+    val connection = dataSource.getConnection()
+    val isolationLevel: I = m.erasure.newInstance.asInstanceOf[I]
+    connection.setAutoCommit(false)
+    connection.setTransactionIsolation(isolationLevel.jdbcLevel)
+    val session = new DbSession[I] { val dbConnection = connection }
     try {
-      val result = action(s)
+      val result = action(session)
       if (F.isFailure(result)) {
         connection.rollback()
       } else {
@@ -35,29 +38,18 @@ trait ActionRunner {
     }
   }
 
-  def processActionEvents(events: List[ActionEvent]): Unit
+  def processActionEvents(events: List[ActionEvent]) {
+    callbacks.synchronized {
+      for {
+        event <- events
+        callback <- callbacks
+        if callback isDefinedAt event
+      } callback(event)
+    }
+  }
 
-}
-
-trait NoOpEventProcessor {
-  def processActionEvents(events: List[ActionEvent]) {}
-}
-
-/**
- * TODO: ensure thread-safety
- */
-trait SynchronousNotifications {
-  private var callbacks: List[PartialFunction[ActionEvent, Unit]] = Nil
-
-  def subscribeSynchronously(callback: PartialFunction[ActionEvent, Unit]) = {
+  def subscribe(callback: PartialFunction[ActionEvent, Unit]) = {
     callbacks = callback :: callbacks
   }
 
-  def processActionEvents(events: List[ActionEvent]) {
-    for {
-      event <- events
-      callback <- callbacks
-      if callback isDefinedAt event
-    } callback(event)
-  }
 }

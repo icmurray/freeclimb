@@ -22,10 +22,10 @@ class ClimbDaoTest extends FunSpec
                    with ShouldMatchers {
 
   val climbDao: ClimbDao = ClimbDao
+  private val runner = new ActionRunner(TestDatabaseSessions.source)
 
   private def cleanTables() {
-    implicit val connection = TestDatabaseSessions.newSession(TransactionRepeatableRead).
-                                                   dbConnection
+    implicit val connection = TestDatabaseSessions.newConnection(new TransactionRepeatableRead())
     SQL("DELETE FROM climbs;").execute()
     SQL("DELETE FROM climb_history;").execute()
     SQL("DELETE FROM crags;").execute()
@@ -42,9 +42,13 @@ class ClimbDaoTest extends FunSpec
     cleanTables()
   }
 
-  private def newSession() = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-  private def run[M[+_], A](action: ApiAction[A, TransactionRepeatableRead]) = {
-    DefaultActionRunner.runInTransaction(newSession())(action)
+  private def newSession() = {
+    val c = TestDatabaseSessions.newConnection(new TransactionRepeatableRead())
+    new DbSession[TransactionRepeatableRead] { override val dbConnection = c }
+  }
+
+  private def run[M[+_], A, I <: IsolationLevel](action: ApiAction[A, I])(implicit m: Manifest[I]) = {
+    runner.run(action)
   }
 
   describe("Climb DAO") {

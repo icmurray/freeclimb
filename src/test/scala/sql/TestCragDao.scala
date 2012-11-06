@@ -22,10 +22,10 @@ class CragDaoTest extends FunSpec
                      with ShouldMatchers {
 
   val cragDao: CragDao = CragDao
+  private val runner = new ActionRunner(TestDatabaseSessions.source)
 
   private def cleanTables() {
-    implicit val connection = TestDatabaseSessions.newSession(TransactionRepeatableRead).
-                                                   dbConnection
+    implicit val connection = TestDatabaseSessions.newConnection(new TransactionRepeatableRead())
     SQL("DELETE FROM crags;").execute()
     SQL("DELETE FROM crag_history;").execute()
     connection.commit()
@@ -40,9 +40,13 @@ class CragDaoTest extends FunSpec
     cleanTables()
   }
 
-  private def newSession() = TestDatabaseSessions.newSession(TransactionRepeatableRead)
-  private def run[M[+_], A](action: ApiAction[A, TransactionRepeatableRead]) = {
-    DefaultActionRunner.runInTransaction(newSession())(action)
+  private def newSession() = {
+    val c = TestDatabaseSessions.newConnection(new TransactionRepeatableRead())
+    new DbSession[TransactionRepeatableRead] { override val dbConnection = c }
+  }
+
+  private def run[M[+_], A, I <: IsolationLevel](action: ApiAction[A, I])(implicit m: Manifest[I]) = {
+    runner.run(action)
   }
 
   describe("Crag DAO") {
@@ -151,8 +155,6 @@ class CragDaoTest extends FunSpec
 
         // First, start a transaction that creates a new Crag, but don't complete it.
         val session1 = newSession()
-        session1.dbConnection.setAutoCommit(false)
-        session1.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
         val newCrag = cragDao.create(burbage).runWith(session1)
         newCrag.fold (
           error => { session1.dbConnection.close() ; fail ("Couldn't create crag") },
@@ -161,13 +163,13 @@ class CragDaoTest extends FunSpec
 
         // Now, create a second session to create the same Crag concurrently.
         val session2 = newSession()
-        session2.dbConnection.setAutoCommit(false)
-        session2.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
 
         // The new Crag is created within a new Thread
         val f = future {
           val action = cragDao.create(newBurbage)
-          DefaultActionRunner.runInTransaction(session2)(action)
+          val result = action.runWith(session2)
+          session2.dbConnection.commit()
+          result map { _._2 }
         }
 
         // *try* to ensure the second transaction has started concurrently
@@ -234,8 +236,6 @@ class CragDaoTest extends FunSpec
         // First, start a transaction that updates the new Crag, but don't complete it.
         val update1 = Revisioned[Crag](newCrag.revision, newBurbage)
         val session1 = newSession()
-        session1.dbConnection.setAutoCommit(false)
-        session1.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
         val updatedCrag = cragDao.update(update1).runWith(session1)
         updatedCrag.fold (
           error => { session1.dbConnection.close() ; fail ("Couldn't update crag") },
@@ -244,14 +244,14 @@ class CragDaoTest extends FunSpec
 
         // Now, create a second session to update the same Crag concurrently.
         val session2 = newSession()
-        session2.dbConnection.setAutoCommit(false)
-        session2.dbConnection.setTransactionIsolation(TransactionRepeatableRead.jdbcLevel)
 
         // The new Crag is updated within a new Thread
         val update2 = Revisioned[Crag](newCrag.revision, newestBurbage)
         val f = future {
           val action = cragDao.update(update2)
-          DefaultActionRunner.runInTransaction(session2)(action)
+          val result = action.runWith(session2)
+          session2.dbConnection.commit()
+          result map { _._2 }
         }
 
         // *try* to ensure the second transaction has started concurrently
