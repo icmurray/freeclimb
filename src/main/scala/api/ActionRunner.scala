@@ -39,17 +39,17 @@ class ActionRunner(private val dataSource: DataSource) {
   }
 
   def processActionEvents(events: List[ActionEvent]) {
-    callbacks.synchronized {
-      for {
-        event <- events
-        callback <- callbacks
-        if callback isDefinedAt event
-      } callback(event)
-    }
+    for {
+      event <- events
+      callback <- callbacks
+      if callback isDefinedAt event
+    } callback(event)
   }
 
   def subscribe(callback: PartialFunction[ActionEvent, Unit]) = {
-    callbacks = callback :: callbacks
+    this.synchronized {
+      callbacks = callback :: callbacks
+    }
   }
 
 }
