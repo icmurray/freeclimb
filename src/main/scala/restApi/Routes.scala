@@ -2,6 +2,9 @@ package freeclimb.restApi
 
 import javax.sql.DataSource
 
+import scalaz._
+import Scalaz._
+
 import spray.json._
 import spray.routing._
 import spray.http._
@@ -33,6 +36,16 @@ trait Routes extends HttpService {
           f       => complete(handleActionFailure(f)),
           success => success map {complete(_)} getOrElse complete(HttpResponse(StatusCodes.NotFound))
         )
+      } ~
+      put {
+        // A PUT request is used to both create and update Crags.
+        entity(as[RichValidation[String, Crag]]) { revision => revision.fold(
+          errors => complete(StatusCodes.BadRequest, errors),
+          crag   => complete(crag)
+        )
+//        } | entity(as[Crag]) { crag =>
+//
+        }
       }
     }
   }

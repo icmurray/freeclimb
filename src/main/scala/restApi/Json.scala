@@ -8,6 +8,7 @@ import spray.json._
 import spray.json.DefaultJsonProtocol._
 
 import freeclimb.models._
+import freeclimb.validation._
 
 object ModelJson extends CragJson
                     with ClimbJson
@@ -15,6 +16,28 @@ object ModelJson extends CragJson
 
 trait CragJson {
   import JsonInstances._
+
+  implicit object CragJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], Crag]] {
+
+    def read(value: JsValue) = {
+
+      val m = value.asJsObject.fields
+      (
+        m.get("name")  .toSuccess("missing value").enrichAs("name")  |@|
+        m.get("title") .toSuccess("missing value").enrichAs("title")
+      ).tupled.disjunction >>= {
+        case (JsString(name), JsString(title)) => Crag(name, title)
+        case _                                 => Map("something" -> NonEmptyList("Failed")).left
+      }
+
+      //value.asJsObject.getFields("name", "title") match {
+      //  case Seq(JsString(name), JsString(title)) =>
+      //    Crag(name, title)
+      //  case _ => throw new DeserializationException("Crag expected")
+      //}
+    }
+
+  }
 
   implicit object CragJsonWriter extends RootJsonWriter[Crag]
                                     with HalJson[Crag] {
