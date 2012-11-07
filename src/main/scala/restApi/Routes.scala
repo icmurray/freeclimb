@@ -21,17 +21,17 @@ trait Routes extends HttpService {
     import modelMarshaller._
     path("crags" / slug / "climbs" / slug) { (cragName, climbName) =>
       get {
-        runner.run { api.getClimb(cragName, climbName) }.fold(
+        runner.run { api.getClimbOption(cragName, climbName) }.fold(
           f       => complete(handleActionFailure(f)),
-          success => complete(success)
+          success => success map {complete(_) } getOrElse complete(HttpResponse(StatusCodes.NotFound))
         )
       }
     } ~
     path("crags" / slug) { cragName =>
       get {
-        runner.run { api.getCrag(cragName) }.fold(
+        runner.run { api.getCragOption(cragName) }.fold(
           f       => complete(handleActionFailure(f)),
-          success => complete(success)
+          success => success map {complete(_)} getOrElse complete(HttpResponse(StatusCodes.NotFound))
         )
       }
     }

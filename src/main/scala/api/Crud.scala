@@ -28,6 +28,7 @@ trait CrudApi {
   def updateClimb(climb: Revisioned[Climb]) = climbDao.update(climb)
   def deleteClimb(climb: Revisioned[Climb]) = climbDao.delete(climb)
   def getClimb(crag: String, climb: String) = climbDao.get(crag, climb)
+  def getClimbOption(crag: String, climb: String) = climbDao.getOption(crag, climb)
 
   // These are here to check that the isolation level checking works.
 
@@ -55,6 +56,7 @@ trait CrudApi {
   def updateCrag(crag: Revisioned[Crag]) = cragDao.update(crag)
   def deleteCrag(crag: Revisioned[Crag]) = cragDao.delete(crag)
   def getCrag(name: String)              = cragDao.get(name)
+  def getCragOption(name: String)        = cragDao.getOption(name)
 
   // This is only here to check that I've setup the Action's implicit
   // functor and monad instances correctly.  I'll remove it later.
