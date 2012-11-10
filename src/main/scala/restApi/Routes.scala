@@ -33,19 +33,27 @@ trait Routes extends HttpService {
     path("crags" / slug) { cragName =>
       get {
         runner.run { api.getCragOption(cragName) }.fold(
-          f       => complete(handleActionFailure(f)),
+          failure => complete(handleActionFailure(failure)),
           success => success map {complete(_)} getOrElse complete(HttpResponse(StatusCodes.NotFound))
         )
       } ~
       put {
-        // A PUT request is used to both create and update Crags.
-        entity(as[RichValidation[String, Crag]]) { revision => revision.fold(
+        entity(as[RichValidation[String, Revisioned[Crag]]]) { revision => revision.fold(
+          errors   => complete(StatusCodes.BadRequest, errors),
+          revision => runner.run { api.updateCrag(revision) }.fold(
+            failure     => complete(handleActionFailure(failure)),
+            newRevision => complete(newRevision)
+          )
+        )}
+      } ~
+      post {
+        entity(as[RichValidation[String, Crag]]) { crag => crag.fold(
           errors => complete(StatusCodes.BadRequest, errors),
-          crag   => complete(crag)
-        )
-//        } | entity(as[Crag]) { crag =>
-//
-        }
+          crag   => runner.run { api.createCrag(crag) }.fold(
+            failure  => complete(handleActionFailure(failure)),
+            revision => complete(StatusCodes.Created, revision)
+          )
+        )}
       }
     }
   }

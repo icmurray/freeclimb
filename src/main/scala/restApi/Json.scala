@@ -20,23 +20,31 @@ trait CragJson {
   implicit object CragJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], Crag]] {
 
     def read(value: JsValue) = {
-
       val m = value.asJsObject.fields
       (
         m.get("name")  .toSuccess("missing value").enrichAs("name")  |@|
         m.get("title") .toSuccess("missing value").enrichAs("title")
       ).tupled.disjunction >>= {
+        // TODO: fail nicely if two JsStrings are not found
         case (JsString(name), JsString(title)) => Crag(name, title)
         case _                                 => Map("something" -> NonEmptyList("Failed")).left
       }
-
-      //value.asJsObject.getFields("name", "title") match {
-      //  case Seq(JsString(name), JsString(title)) =>
-      //    Crag(name, title)
-      //  case _ => throw new DeserializationException("Crag expected")
-      //}
     }
 
+  }
+
+  implicit object RevisionedCragJsonRead extends RootJsonReader[\/[Map[String, NonEmptyList[String]], Revisioned[Crag]]] {
+    def read(value: JsValue) = {
+      val m = value.asJsObject.fields
+      (
+        m.get("name")     .toSuccess("missing value").enrichAs("name")    |@|
+        m.get("title")    .toSuccess("missing value").enrichAs("title")   |@|
+        m.get("revision") .toSuccess("missing value").enrichAs("revision")
+      ).tupled.disjunction >>= {
+        case (JsString(name), JsString(title), JsNumber(revision)) => Crag(name, title) map { c => Revisioned(revision.longValue, c) }
+        case _                                                     => Map("something" -> NonEmptyList("Failed")).left
+      }
+    }
   }
 
   implicit object CragJsonWriter extends RootJsonWriter[Crag]
@@ -106,7 +114,7 @@ trait HalJson[T] {
 trait RevisionedJson {
   import JsonInstances._
 
-  implicit def revisionedJsonFormat[T : RootJsonWriter] = new RootJsonWriter[Revisioned[T]] {
+  implicit def revisionedJsonWriter[T : RootJsonWriter] = new RootJsonWriter[Revisioned[T]] {
     def write(revision: Revisioned[T]) = {
       val modelJson = implicitly[RootJsonWriter[T]].write(revision.model).asJsObject
       modelJson |+| JsObject("revision" -> JsNumber(revision.revision))

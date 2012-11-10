@@ -33,6 +33,7 @@ trait ModelMarshallers {
   implicit val revisionedClimbMarshaller = modelMarshaller[Revisioned[Climb]]
 
   implicit val cragUnmarshaller = modelUnmarshaller[RichValidation[String, Crag]]
+  implicit val revisionedCragUnMarshaller = modelUnmarshaller[RichValidation[String, Revisioned[Crag]]]
 
   private def modelMarshaller[T : RootJsonWriter]: Marshaller[T] =
     Marshaller.delegate[T, String](`application/json`, `application/hal+json`) { value =>
