@@ -13,25 +13,44 @@ import freeclimb.validation._
 object ModelJson extends CragJson
                     with ClimbJson
                     with RevisionedJson
+                    with ResourceJson
 
-trait CragJson {
-  import JsonInstances._
-
-  implicit object CragJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], Crag]] {
+trait ResourceJson {
+  
+  implicit object CragResourceJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], CragResource]] {
 
     def read(value: JsValue) = {
       val m = value.asJsObject.fields
-      (
-        m.get("name")  .toSuccess("missing value").enrichAs("name")  |@|
+      ( m.get("name")  .toSuccess("missing value").enrichAs("name")  |@|
         m.get("title") .toSuccess("missing value").enrichAs("title")
-      ).tupled.disjunction >>= {
+        ).tupled.disjunction >>= {
         // TODO: fail nicely if two JsStrings are not found
-        case (JsString(name), JsString(title)) => Crag(name, title)
+        case (JsString(name), JsString(title)) => CragResource(title).right
         case _                                 => Map("something" -> NonEmptyList("Failed")).left
       }
     }
 
   }
+
+  implicit object RevisionedCragResourceJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], RevisionedCragResource]] {
+
+    def read(value: JsValue) = {
+      val m = value.asJsObject.fields
+      ( m.get("name")     .toSuccess("missing value").enrichAs("name")    |@|
+        m.get("title")    .toSuccess("missing value").enrichAs("title")   |@|
+        m.get("revision") .toSuccess("missing value").enrichAs("revision")
+      ).tupled.disjunction >>= {
+        // TODO: fail nicely if two JsStrings are not found
+        case (JsString(name), JsString(title), JsNumber(revision)) => RevisionedCragResource(title, revision.longValue).right
+        case _                                 => Map("something" -> NonEmptyList("Failed")).left
+      }
+    }
+
+  }
+}
+
+trait CragJson {
+  import JsonInstances._
 
   implicit object RevisionedCragJsonRead extends RootJsonReader[\/[Map[String, NonEmptyList[String]], Revisioned[Crag]]] {
     def read(value: JsValue) = {
@@ -47,6 +66,20 @@ trait CragJson {
     }
   }
 
+  implicit object CragJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], Crag]] {
+
+    def read(value: JsValue) = {
+      val m = value.asJsObject.fields
+      ( m.get("name")  .toSuccess("missing value").enrichAs("name")  |@|
+        m.get("title") .toSuccess("missing value").enrichAs("title")
+        ).tupled.disjunction >>= {
+        // TODO: fail nicely if two JsStrings are not found
+        case (JsString(name), JsString(title)) => Crag(name, title)
+        case _                                 => Map("something" -> NonEmptyList("Failed")).left
+      }
+    }
+
+  }
   implicit object CragJsonWriter extends RootJsonWriter[Crag]
                                     with HalJson[Crag] {
 

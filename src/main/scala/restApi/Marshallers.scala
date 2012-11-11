@@ -46,9 +46,20 @@ trait ModelMarshallers { this: MimeTypes =>
       printer(value.mapValues(_.toList).toJson)
     }
 }
+
+/**
+ * Rather than unmarshalling domain objects directly, there's an extra level
+ * of indirection, where resource representations are unmarshalled to
+ * representations of the resources, rather than the domain models.  This
+ * allows, amongst other things, versioning of the api; and resources to be
+ * partial representations of the domain models.
+ */
 trait RestResourceUnMarshallers { this: MimeTypes =>
 
   type RichValidation[E,A] = \/[Map[String,NonEmptyList[E]], A]
+
+  implicit val cragResourceUnmarshaller = modelUnmarshaller[RichValidation[String, CragResource]]
+  implicit val revisionedCragResourceUnmarshaller = modelUnmarshaller[RichValidation[String, RevisionedCragResource]]
 
   implicit val cragUnmarshaller = modelUnmarshaller[RichValidation[String, Crag]]
   implicit val revisionedCragUnMarshaller = modelUnmarshaller[RichValidation[String, Revisioned[Crag]]]
