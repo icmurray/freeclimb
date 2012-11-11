@@ -40,7 +40,7 @@ trait Routes extends HttpService {
       put {
         entity(as[RichValidation[String, Revisioned[Crag]]]) { revision => revision.fold(
           errors   => complete(StatusCodes.BadRequest, errors),
-          revision => runner.run { api.updateCrag(revision) }.fold(
+          revision => runner.run { api.updateCrag(revision, cragName) }.fold(
             failure     => complete(handleActionFailure(failure)),
             newRevision => complete(newRevision)
           )

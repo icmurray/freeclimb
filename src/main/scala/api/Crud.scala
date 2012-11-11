@@ -58,6 +58,14 @@ trait CrudApi {
   def getCrag(name: String)              = cragDao.get(name)
   def getCragOption(name: String)        = cragDao.getOption(name)
 
+  def updateCrag(crag: Revisioned[Crag], name: String): ApiUpdateAction[Revisioned[Crag]] = {
+    if (name == crag.model.name) {
+      updateCrag(crag)
+    } else {
+      ApiUpdateAction(_ => NotImplemented().left)
+    }
+  }
+
   // This is only here to check that I've setup the Action's implicit
   // functor and monad instances correctly.  I'll remove it later.
   private def createAndDelete(climb: Climb) = for {
