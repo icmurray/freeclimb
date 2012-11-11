@@ -20,13 +20,10 @@ trait ResourceJson {
   implicit object CragResourceJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], CragResource]] {
 
     def read(value: JsValue) = {
-      val m = value.asJsObject.fields
-      ( m.get("name")  .toSuccess("missing value").enrichAs("name")  |@|
-        m.get("title") .toSuccess("missing value").enrichAs("title")
-        ).tupled.disjunction >>= {
-        // TODO: fail nicely if two JsStrings are not found
-        case (JsString(name), JsString(title)) => CragResource(title).right
-        case _                                 => Map("something" -> NonEmptyList("Failed")).left
+      implicit val m = value.asJsObject.fields
+
+      extract[JsString]("title").disjunction >>= { title =>
+        CragResource(title.value).right
       }
     }
 
@@ -35,17 +32,39 @@ trait ResourceJson {
   implicit object RevisionedCragResourceJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], RevisionedCragResource]] {
 
     def read(value: JsValue) = {
-      val m = value.asJsObject.fields
-      ( m.get("name")     .toSuccess("missing value").enrichAs("name")    |@|
-        m.get("title")    .toSuccess("missing value").enrichAs("title")   |@|
-        m.get("revision") .toSuccess("missing value").enrichAs("revision")
-      ).tupled.disjunction >>= {
-        // TODO: fail nicely if two JsStrings are not found
-        case (JsString(name), JsString(title), JsNumber(revision)) => RevisionedCragResource(title, revision.longValue).right
-        case _                                 => Map("something" -> NonEmptyList("Failed")).left
+      implicit val m = value.asJsObject.fields
+      ( extract[JsString]("title")    |@|
+        extract[JsNumber]("revision")
+      ).tupled.disjunction >>= { case (title, revision) =>
+        RevisionedCragResource(title.value, revision.value.longValue).right
       }
     }
 
+  }
+
+  private def extract[T <: JsValue](field: String)
+                                   (implicit m: Map[String, JsValue], M: Manifest[T]) = {
+    m.get(field).
+      toSuccess("missing value").
+      flatMap(tryCast[T](_)).
+      enrichAs(field)
+  }
+
+  private lazy val jsObjectClass = ClassManifest.fromClass(classOf[JsObject])
+  private lazy val jsStringClass = ClassManifest.fromClass(classOf[JsString])
+  private lazy val jsNumberClass = ClassManifest.fromClass(classOf[JsNumber])
+  private lazy val jsArrayClass = ClassManifest.fromClass(classOf[JsArray])
+  private lazy val jsBooleanClass = ClassManifest.fromClass(classOf[JsBoolean])
+
+  private def tryCast[T <: JsValue](o: AnyRef)(implicit m: Manifest[T]) = {
+    if (Manifest.singleType(o) <:< m) {
+      o.asInstanceOf[T].success
+    } else if (m <:< jsObjectClass)  { "Object expected".failure }
+      else if (m <:< jsStringClass)  { "String expected".failure }
+      else if (m <:< jsNumberClass)  { "Number expected".failure }
+      else if (m <:< jsArrayClass)   { "Array expected".failure }
+      else if (m <:< jsBooleanClass) { "Boolean expected".failure }
+      else                           { "Something else expected".failure }
   }
 }
 
