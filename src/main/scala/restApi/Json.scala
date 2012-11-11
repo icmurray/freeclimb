@@ -71,34 +71,6 @@ trait ResourceJson {
 trait CragJson {
   import JsonInstances._
 
-  implicit object RevisionedCragJsonRead extends RootJsonReader[\/[Map[String, NonEmptyList[String]], Revisioned[Crag]]] {
-    def read(value: JsValue) = {
-      val m = value.asJsObject.fields
-      (
-        m.get("name")     .toSuccess("missing value").enrichAs("name")    |@|
-        m.get("title")    .toSuccess("missing value").enrichAs("title")   |@|
-        m.get("revision") .toSuccess("missing value").enrichAs("revision")
-      ).tupled.disjunction >>= {
-        case (JsString(name), JsString(title), JsNumber(revision)) => Crag(name, title) map { c => Revisioned(revision.longValue, c) }
-        case _                                                     => Map("something" -> NonEmptyList("Failed")).left
-      }
-    }
-  }
-
-  implicit object CragJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], Crag]] {
-
-    def read(value: JsValue) = {
-      val m = value.asJsObject.fields
-      ( m.get("name")  .toSuccess("missing value").enrichAs("name")  |@|
-        m.get("title") .toSuccess("missing value").enrichAs("title")
-        ).tupled.disjunction >>= {
-        // TODO: fail nicely if two JsStrings are not found
-        case (JsString(name), JsString(title)) => Crag(name, title)
-        case _                                 => Map("something" -> NonEmptyList("Failed")).left
-      }
-    }
-
-  }
   implicit object CragJsonWriter extends RootJsonWriter[Crag]
                                     with HalJson[Crag] {
 

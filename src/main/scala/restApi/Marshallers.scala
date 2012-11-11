@@ -60,9 +60,6 @@ trait RestResourceUnMarshallers { this: MimeTypes =>
   implicit val cragResourceUnmarshaller = modelUnmarshaller[Disj[CragResource]]
   implicit val revisionedCragResourceUnmarshaller = modelUnmarshaller[Disj[RevisionedCragResource]]
 
-  implicit val cragUnmarshaller = modelUnmarshaller[Disj[Crag]]
-  implicit val revisionedCragUnMarshaller = modelUnmarshaller[Disj[Revisioned[Crag]]]
-
   private def modelUnmarshaller[T : RootJsonReader]: Unmarshaller[T] =
     Unmarshaller.delegate[String, T](`application/json`, `application/hal+json`) { string =>
       string.asJson.convertTo[T]
