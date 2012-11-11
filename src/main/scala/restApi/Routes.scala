@@ -15,13 +15,15 @@ import freeclimb.models._
 import freeclimb.sql._
 
 trait Routes extends HttpService {
+  
 
   private val modelMarshaller = new BasicModelMarshallers(true)
+  import modelMarshaller._
+
   protected val api: CrudApi
   protected def runner: ActionRunner
 
   lazy val routes = {
-    import modelMarshaller._
     path("crags" / slug / "climbs" / slug) { (cragName, climbName) =>
       get {
         runner.run { api.getClimbOption(cragName, climbName) }.fold(
@@ -38,16 +40,16 @@ trait Routes extends HttpService {
         )
       } ~
       put {
-        entity(as[RichValidation[String, Revisioned[Crag]]]) { revision => revision.fold(
+        entity(as[RichValidation[String, RevisionedCragResource]]) { resourceToCragRevision(_, cragName).fold(
           errors   => complete(StatusCodes.BadRequest, errors),
-          revision => runner.run { api.updateCrag(revision, cragName) }.fold(
+          revision => runner.run { api.updateCrag(revision) }.fold(
             failure     => complete(handleActionFailure(failure)),
             newRevision => complete(newRevision)
           )
         )}
       } ~
       post {
-        entity(as[RichValidation[String, Crag]]) { crag => crag.fold(
+        entity(as[RichValidation[String, CragResource]]) { resourceToCrag(_, cragName).fold(
           errors => complete(StatusCodes.BadRequest, errors),
           crag   => runner.run { api.createCrag(crag) }.fold(
             failure  => complete(handleActionFailure(failure)),
@@ -55,6 +57,20 @@ trait Routes extends HttpService {
           )
         )}
       }
+    }
+  }
+
+  private def resourceToCragRevision(resourceD: RichValidation[String, RevisionedCragResource], cragName: String) = {
+    resourceD >>= { resource: RevisionedCragResource =>
+      Crag(cragName, resource.title) map { crag: Crag =>
+        Revisioned[Crag](resource.revision.longValue, crag)
+      }
+    }
+  }
+
+  private def resourceToCrag(resourceDisjunction: RichValidation[String, CragResource], cragName: String) = {
+    resourceDisjunction >>= { resource: CragResource =>
+      Crag(cragName, resource.title)
     }
   }
 
