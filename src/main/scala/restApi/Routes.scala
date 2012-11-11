@@ -13,6 +13,7 @@ import spray.httpx.marshalling._
 import freeclimb.api._
 import freeclimb.models._
 import freeclimb.sql._
+import freeclimb.validation._
 
 trait Routes extends HttpService {
   
@@ -40,7 +41,7 @@ trait Routes extends HttpService {
         )
       } ~
       put {
-        entity(as[RichValidation[String, RevisionedCragResource]]) { resourceToCragRevision(_, cragName).fold(
+        entity(as[Disj[RevisionedCragResource]]) { resourceToCragRevision(_, cragName).fold(
           errors   => complete(StatusCodes.BadRequest, errors),
           revision => runner.run { api.updateCrag(revision) }.fold(
             failure     => complete(handleActionFailure(failure)),
@@ -49,7 +50,7 @@ trait Routes extends HttpService {
         )}
       } ~
       post {
-        entity(as[RichValidation[String, CragResource]]) { resourceToCrag(_, cragName).fold(
+        entity(as[Disj[CragResource]]) { resourceToCrag(_, cragName).fold(
           errors => complete(StatusCodes.BadRequest, errors),
           crag   => runner.run { api.createCrag(crag) }.fold(
             failure  => complete(handleActionFailure(failure)),
@@ -60,7 +61,7 @@ trait Routes extends HttpService {
     }
   }
 
-  private def resourceToCragRevision(resourceD: RichValidation[String, RevisionedCragResource], cragName: String) = {
+  private def resourceToCragRevision(resourceD: Disj[RevisionedCragResource], cragName: String) = {
     resourceD >>= { resource: RevisionedCragResource =>
       Crag(cragName, resource.title) map { crag: Crag =>
         Revisioned[Crag](resource.revision.longValue, crag)
@@ -68,7 +69,7 @@ trait Routes extends HttpService {
     }
   }
 
-  private def resourceToCrag(resourceDisjunction: RichValidation[String, CragResource], cragName: String) = {
+  private def resourceToCrag(resourceDisjunction: Disj[CragResource], cragName: String) = {
     resourceDisjunction >>= { resource: CragResource =>
       Crag(cragName, resource.title)
     }

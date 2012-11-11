@@ -14,6 +14,7 @@ import spray.json.DefaultJsonProtocol._
 import freeclimb.api._
 import freeclimb.models._
 import freeclimb.restApi.ModelJson._
+import freeclimb.validation._
 
 class BasicModelMarshallers(val prettyPrint: Boolean) extends ModelMarshallers
                                                       with RestResourceUnMarshallers
@@ -56,13 +57,11 @@ trait ModelMarshallers { this: MimeTypes =>
  */
 trait RestResourceUnMarshallers { this: MimeTypes =>
 
-  type RichValidation[E,A] = \/[Map[String,NonEmptyList[E]], A]
+  implicit val cragResourceUnmarshaller = modelUnmarshaller[Disj[CragResource]]
+  implicit val revisionedCragResourceUnmarshaller = modelUnmarshaller[Disj[RevisionedCragResource]]
 
-  implicit val cragResourceUnmarshaller = modelUnmarshaller[RichValidation[String, CragResource]]
-  implicit val revisionedCragResourceUnmarshaller = modelUnmarshaller[RichValidation[String, RevisionedCragResource]]
-
-  implicit val cragUnmarshaller = modelUnmarshaller[RichValidation[String, Crag]]
-  implicit val revisionedCragUnMarshaller = modelUnmarshaller[RichValidation[String, Revisioned[Crag]]]
+  implicit val cragUnmarshaller = modelUnmarshaller[Disj[Crag]]
+  implicit val revisionedCragUnMarshaller = modelUnmarshaller[Disj[Revisioned[Crag]]]
 
   private def modelUnmarshaller[T : RootJsonReader]: Unmarshaller[T] =
     Unmarshaller.delegate[String, T](`application/json`, `application/hal+json`) { string =>

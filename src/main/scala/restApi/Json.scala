@@ -17,7 +17,7 @@ object ModelJson extends CragJson
 
 trait ResourceJson {
   
-  implicit object CragResourceJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], CragResource]] {
+  implicit object CragResourceJsonReader extends RootJsonReader[Disj[CragResource]] {
 
     def read(value: JsValue) = {
       implicit val m = value.asJsObject.fields
@@ -29,7 +29,7 @@ trait ResourceJson {
 
   }
 
-  implicit object RevisionedCragResourceJsonReader extends RootJsonReader[\/[Map[String,NonEmptyList[String]], RevisionedCragResource]] {
+  implicit object RevisionedCragResourceJsonReader extends RootJsonReader[Disj[RevisionedCragResource]] {
 
     def read(value: JsValue) = {
       implicit val m = value.asJsObject.fields

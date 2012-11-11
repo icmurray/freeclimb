@@ -5,6 +5,8 @@ import Scalaz._
 
 package object validation {
 
+  type Disj[A] = \/[Map[String,NonEmptyList[String]], A]
+
   /** RichValidation trait
     *
     * Provides richer error information, in the form of a map from Strings to
