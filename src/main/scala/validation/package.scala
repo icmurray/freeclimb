@@ -48,9 +48,11 @@ package object validation {
     case _                     => Success(s)
   }
 
-  val lowerAlpha = Set('a' to 'z': _*)
-  val upperAlpha = Set('A' to 'Z': _*)
-  val numerAlpha = Set('0' to '9': _*)
+  val lowerAlpha    = Set('a' to 'z': _*)
+  val upperAlpha    = Set('A' to 'Z': _*)
+  val numerAlpha    = Set('0' to '9': _*)
+  val nonAlphaChars = Set('-', '_')
+  val slugChars     = nonAlphaChars ++ lowerAlpha ++ upperAlpha ++ numerAlpha
 
   def onlyContains(chars: Set[Char])(implicit s: String) = s.toSet match {
     case set if set subsetOf chars => Success(s)

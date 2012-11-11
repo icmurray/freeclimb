@@ -79,7 +79,6 @@ object Crag {
    * Validation functions for each field of Crag
    */
   
-  private val slugChars = lowerAlpha ++ upperAlpha ++ numerAlpha
   private def validateName(implicit name: String) = {
     nonEmpty                .toValidationNEL <*
     maxLength(20)           .toValidationNEL <*
