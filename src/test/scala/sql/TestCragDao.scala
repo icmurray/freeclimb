@@ -22,7 +22,7 @@ class CragDaoTest extends FunSpec
                      with ShouldMatchers {
 
   val cragDao: CragDao = CragDao
-  private val runner = new ActionRunner(TestDatabaseSessions.source)
+  private val runner = new DefaultActionRunner(TestDatabaseSessions.source)
 
   private def cleanTables() {
     implicit val connection = TestDatabaseSessions.newConnection(new TransactionRepeatableRead())

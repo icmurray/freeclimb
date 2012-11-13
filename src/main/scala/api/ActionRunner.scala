@@ -7,7 +7,11 @@ import Scalaz._
 
 import freeclimb.sql.IsolationLevel
 
-class ActionRunner(private val dataSource: DataSource) {
+trait ActionRunner {
+  def run[M[+_],A,I <: IsolationLevel, W <: List[ActionEvent]](action: ActionT[M,A,I,W])(implicit F: Failable[M[_]], M: Functor[M], m: Manifest[I]): M[A]
+}
+
+class DefaultActionRunner(private val dataSource: DataSource) extends ActionRunner {
 
   // TODO: decide whether these should be callbacks, or some sort of Listener
   private var callbacks: List[PartialFunction[ActionEvent, Unit]] = Nil
