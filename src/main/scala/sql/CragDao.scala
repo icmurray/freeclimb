@@ -198,21 +198,21 @@ trait CragDao extends Repository[Crag]
     ).as(revisionedCrag("crag_history") *).right
   }
 
-  private def created(crag: Crag, revision: Long) = {
+  protected def created(crag: Crag, revision: Long) = {
     val rev = Revisioned[Crag](revision, crag)
     (List(CragCreated(rev)), rev)
   }
 
-  private def updated(crag: Crag, revision: Long) = {
+  protected def updated(crag: Crag, revision: Long) = {
     val rev = Revisioned[Crag](revision, crag)
     (List(CragUpdated(rev)), rev)
   }
 
-  private def deleted(rev: Revisioned[Crag]) = {
+  protected def deleted(rev: Revisioned[Crag]) = {
     (List(CragDeleted(rev)), rev)
   }
 
-  private def purged(rev: Revisioned[Crag]) = {
+  protected def purged(rev: Revisioned[Crag]) = {
     (List(CragPurged(rev)), rev)
   }
 }

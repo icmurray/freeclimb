@@ -37,3 +37,5 @@ scalacOptions += "-Ydependent-method-types"
 
 // Test deps
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test" withSources() withJavadoc()
+
+libraryDependencies += "io.spray" % "spray-testkit" % "1.0-M3" % "test" withSources() withJavadoc()
