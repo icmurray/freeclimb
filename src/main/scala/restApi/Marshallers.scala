@@ -24,7 +24,7 @@ class BasicModelMarshallers(val prettyPrint: Boolean) extends ModelMarshallers
 
 trait MimeTypes {
 
-  val `application/hal+json` = MediaTypes.register(new ApplicationMediaType("hal+json", "json"))
+  lazy val `application/hal+json` = MediaTypes.register(new ApplicationMediaType("hal+json", "json"))
 
 }
 
