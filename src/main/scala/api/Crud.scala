@@ -1,6 +1,5 @@
 package freeclimb.api
 
-import freeclimb.common._
 import freeclimb.models._
 import freeclimb.sql._
 

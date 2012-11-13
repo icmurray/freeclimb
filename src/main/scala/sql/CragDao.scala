@@ -9,7 +9,6 @@ import scalaz._
 import Scalaz._
 
 import freeclimb.api._
-import freeclimb.common._
 import freeclimb.models._
 
 import freeclimb.sql.SqlError._
@@ -23,35 +22,6 @@ object CragDao extends CragDao
  */
 trait CragDao extends Repository[Crag]
                  with Dao {
-
-  //override def create(crag: Crag) = ApiAction { session =>
-  //  implicit val connection = session.dbConnection
-
-  //  try{
-
-  //    val nextRevision: Long = SQL("SELECT nextval('revision_seq');").as(scalar[Long].single)
-
-  //    SQL(
-  //      """
-  //      INSERT INTO crags(name, title, revision)
-  //        VALUES ({name}, {title}, {revision});
-  //      """
-  //    ).on("name"     -> crag.name,
-  //         "title"    -> crag.title,
-  //         "revision" -> nextRevision
-  //    ).executeInsert()
-
-  //    created(crag, nextRevision).right
-
-  //  } catch {
-  //    case e: SQLException => e.sqlError match {
-  //      case Some(UniqueViolation) => EditConflict().left
-  //      case _                     => throw e
-  //    }
-  //    case e => throw e
-  //  }
-
-  //}
 
   override def create(crag: Crag) = ApiAction { session =>
     implicit val connection = session.dbConnection
