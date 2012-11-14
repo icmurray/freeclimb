@@ -25,6 +25,15 @@ trait Routes extends HttpService {
   protected val api: CrudApi
   protected def runner: ActionRunner
 
+  private def run[A,I<:IsolationLevel](action: ApiAction[A,I])
+                                            (onSuccess: A => Route)
+                                            (implicit m: Manifest[I]) = {
+    runner.run(action).fold(
+      failure => complete(handleActionFailure(failure)),
+      success => onSuccess(success)
+    )
+  }
+
   lazy val routes = {
     path("crags" / slug / "climbs" / slug) { (cragName, climbName) =>
       get {
@@ -36,22 +45,19 @@ trait Routes extends HttpService {
     } ~
     path("crags" / slug) { cragName =>
       get {
-        runner.run { api.getCragOption(cragName) }.fold(
-          failure => complete(handleActionFailure(failure)),
-          success => success map { crag =>
+        run(api.getCragOption(cragName)) { success =>
+          success map { crag =>
 
-              respondWithHeader(RawHeader("ETag", crag.revision.toString)) {
+            respondWithHeader(ETag(crag.revision.toString)) {
+              headerValue(ifNoneMatch) { revision =>
+                if (revision  == crag.revision.toString) {
+                  complete(HttpResponse(StatusCodes.NotModified))
+                } else { reject }
+              } ~ complete(crag) 
+            }
 
-                headerValue[String](ifNoneMatch) { revision =>
-                  if (revision  == crag.revision.toString) {
-                    complete(HttpResponse(StatusCodes.NotModified))
-                  } else {
-                    reject
-                  }
-                } ~ complete(crag) 
-              }
-            } getOrElse complete(HttpResponse(StatusCodes.NotFound))
-        )
+          } getOrElse complete(HttpResponse(StatusCodes.NotFound))
+        }
       } ~
       put {
         entity(as[Disj[RevisionedCragResource]]) { resourceToCragRevision(_, cragName).fold(
@@ -102,3 +108,6 @@ trait Routes extends HttpService {
 
   private lazy val slug = "[a-zA-Z0-9_-]+".r
 }
+  
+private case class ETag(override val value: String) extends RawHeader("ETag", value)
+
