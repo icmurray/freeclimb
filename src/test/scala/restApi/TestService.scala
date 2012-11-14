@@ -24,26 +24,37 @@ class ServiceTest extends FunSpec
 
   before {
     api.reset()
+    runner.run { api.createCrag(burbage) }
   }
 
   describe("The Service") {
-    describe("The crag resource") {
+    describe("/crags/<crag>") {
+      describe("GET-ing a crag resource") {
 
-      describe("Should return 404 if crag does not exist") {
-        Get("/crags/does-not-exist") ~> routes ~> check {
-          status should equal (NotFound)
+        it("Should 404 if the crag does not exist") {
+          Get("/crags/does-not-exist") ~> routes ~> check {
+            status should equal (NotFound)
+          }
         }
-      }
 
-      describe("Should 200 if the crag exists") {
-
-        runner.run { api.createCrag(burbage) }
-
-        Get("/crags/burbage") ~> routes ~> check {
-          status should equal (OK)
+        it("Should 200 if the crag exists") {
+          Get("/crags/burbage") ~> routes ~> check {
+            status should equal (OK)
+          }
         }
-      }
 
+        it("Should contain the revision in the ETag header") {
+          Get("/crags/burbage") ~> routes ~> check {
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
+
+        it("Should contain the revision in the representation") (pending)
+        it("Should describe the requested crag as JSON") (pending)
+
+      }
     }
   }
 

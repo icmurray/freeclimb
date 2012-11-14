@@ -8,6 +8,7 @@ import Scalaz._
 import spray.json._
 import spray.routing._
 import spray.http._
+import spray.http.HttpHeaders._
 import spray.httpx.marshalling._
 
 import freeclimb.api._
@@ -37,7 +38,9 @@ trait Routes extends HttpService {
       get {
         runner.run { api.getCragOption(cragName) }.fold(
           failure => complete(handleActionFailure(failure)),
-          success => success map {complete(_)} getOrElse complete(HttpResponse(StatusCodes.NotFound))
+          success => success map { crag =>
+              respondWithHeader(RawHeader("ETag", crag.revision.toString)) {complete(crag) }
+            } getOrElse complete(HttpResponse(StatusCodes.NotFound))
         )
       } ~
       put {
