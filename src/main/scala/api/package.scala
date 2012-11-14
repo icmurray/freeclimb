@@ -5,7 +5,6 @@ import javax.sql.DataSource
 import scalaz._
 import Scalaz._
 
-import freeclimb.common._
 import freeclimb.models._
 import freeclimb.sql._
 

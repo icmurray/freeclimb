@@ -3,7 +3,6 @@ package freeclimb.sql
 import java.sql.Connection
 
 import freeclimb.api._
-import freeclimb.common._
 import freeclimb.models.Revisioned
 
 /**
