@@ -79,6 +79,21 @@ class ServiceTest extends FunSpec
           }
         }
 
+        it("Should 304 (Not Modified) if given a matching ETag in If-None-Match") {
+
+        }
+
+        it("Should 200 if ETag does not match") (pending)
+
+      }
+
+      describe("PUT-ing a new resource") {
+        it("Should create a new Crag if one doesn't exist already") (pending)
+        it("Should require either the If-None-Match or If-Match header") (pending)
+        it("Should reject the request if the Crag already exists") (pending)
+        it("Should reject the request if the Crag is invalid") (pending)
+        it("Should reject the request if the body isn't valid json") (pending)
+        it("Should reject the request if the body is missing a required field") (pending)
       }
     }
   }
