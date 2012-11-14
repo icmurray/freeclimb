@@ -16,7 +16,7 @@ resolvers += "spray repo" at "http://repo.spray.io"
 
 libraryDependencies += "com.github.seratch" %% "scalikesolr" % "(3.6,)" withSources() withJavadoc()
 
-libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.0-M3" withSources() withJavadoc()
+libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.0-M4" withSources() withJavadoc()
 
 libraryDependencies += "play" %% "anorm" % "2.1-09142012" withSources() withSources()
 
