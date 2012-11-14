@@ -24,9 +24,9 @@ libraryDependencies += "postgresql" % "postgresql" % "9.1-901-1.jdbc4" withSourc
 
 libraryDependencies += "com.googlecode.flyway" % "flyway-core" % "1.7" withSources() withJavadoc()
 
-libraryDependencies += "io.spray" % "spray-can" % "1.0-M3" withSources() withJavadoc()
+libraryDependencies += "io.spray" % "spray-can" % "1.0-M5" withSources() withJavadoc()
 
-libraryDependencies += "io.spray" % "spray-routing" % "1.0-M3" withSources() withJavadoc()
+libraryDependencies += "io.spray" % "spray-routing" % "1.0-M5" withSources() withJavadoc()
 
 libraryDependencies += "io.spray" %%  "spray-json" % "1.2.2" withSources() withJavadoc()
 
@@ -38,4 +38,4 @@ scalacOptions += "-Ydependent-method-types"
 // Test deps
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.8" % "test" withSources() withJavadoc()
 
-libraryDependencies += "io.spray" % "spray-testkit" % "1.0-M3" % "test" withSources() withJavadoc()
+libraryDependencies += "io.spray" % "spray-testkit" % "1.0-M5" % "test" withSources() withJavadoc()
