@@ -15,7 +15,6 @@ class CragDaoMock extends CragDao {
   reset()
 
   override def create(crag: Crag) = ApiAction { session =>
-    print("Creating: " + crag)
     revision += 1
     val rev = Revisioned(revision, crag)
     crags += rev
@@ -23,8 +22,6 @@ class CragDaoMock extends CragDao {
   }
 
   override def getOption(name: String) = ApiReadAction { session =>
-    print(name)
-    print(crags)
     crags.find(c => c.model.name == name).right
   }
 
