@@ -59,16 +59,16 @@ trait Routes extends HttpService {
           } getOrElse complete(HttpResponse(StatusCodes.NotFound))
         }
       } ~
+      //put {
+      //  entity(as[Disj[RevisionedCragResource]]) { resourceToCragRevision(_, cragName).fold(
+      //    errors   => complete(StatusCodes.BadRequest, errors),
+      //    revision => runner.run { api.updateCrag(revision) }.fold(
+      //      failure     => complete(handleActionFailure(failure)),
+      //      newRevision => complete(newRevision)
+      //    )
+      //  )}
+      //} ~
       put {
-        entity(as[Disj[RevisionedCragResource]]) { resourceToCragRevision(_, cragName).fold(
-          errors   => complete(StatusCodes.BadRequest, errors),
-          revision => runner.run { api.updateCrag(revision) }.fold(
-            failure     => complete(handleActionFailure(failure)),
-            newRevision => complete(newRevision)
-          )
-        )}
-      } ~
-      post {
         entity(as[Disj[CragResource]]) { resourceToCrag(_, cragName).fold(
           errors => complete(StatusCodes.BadRequest, errors),
           crag   => runner.run { api.createCrag(crag) }.fold(

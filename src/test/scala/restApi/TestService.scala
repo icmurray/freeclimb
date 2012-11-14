@@ -3,7 +3,9 @@ package freeclimb.restApi
 import org.scalatest.{FunSpec, BeforeAndAfter}
 import org.scalatest.matchers.ShouldMatchers
 
+import spray.httpx.marshalling._
 import spray.httpx.unmarshalling._
+import spray.http.HttpHeaders._
 import spray.http.MediaTypes._
 import spray.json._
 import spray.json.DefaultJsonProtocol._
@@ -101,12 +103,63 @@ class ServiceTest extends FunSpec
       }
 
       describe("PUT-ing a new resource") {
-        it("Should create a new Crag if one doesn't exist already") (pending)
+        it("Should create a new Crag if one doesn't exist already") {
+          val jsonContent = """{"title": "Stanage Edge"}""".asJson.asJsObject
+          Put("/crags/stanage", jsonContent) ~> routes ~> check {
+            status should equal (Created)
+          }
+
+          Get("/crags/stanage") ~> routes ~> check {
+            status should equal (OK)
+
+            val json = entityAs[JsObject]
+
+            val name = json.fields.get("name")
+            name should not equal (None)
+            name.get.asInstanceOf[JsString].value should equal("stanage")
+
+            val title = json.fields.get("title")
+            title should not equal (None)
+            title.get.asInstanceOf[JsString].value should equal("Stanage Edge")
+          }
+
+        }
+
         it("Should require either the If-None-Match or If-Match header") (pending)
-        it("Should reject the request if the Crag already exists") (pending)
-        it("Should reject the request if the Crag is invalid") (pending)
-        it("Should reject the request if the body isn't valid json") (pending)
-        it("Should reject the request if the body is missing a required field") (pending)
+        
+        it("Should reject the request if the Crag already exists") {
+          val jsonContent = """{"title": "Burbage Edge"}""".asJson.asJsObject
+          Put("/crags/burbage", jsonContent) ~> routes ~> check {
+            status should equal (Conflict)
+          }
+        }
+
+        it("Should reject the request if the Crag is invalid") {
+          val jsonContent = """{"title": ""}""".asJson.asJsObject
+          Put("/crags/burbage", jsonContent) ~> routes ~> check {
+            status should equal (BadRequest)
+          }
+        }
+
+        it("Should reject the request if the body isn't valid json") {
+          Put("/crags/burbage", 100) ~> sealRoute(routes) ~> check {
+            status should equal (BadRequest)
+          }
+        }
+
+        it("Should reject the request if the body is missing a required field") {
+          val jsonContent = "{}".asJson.asJsObject
+          Put("/crags/burbage", jsonContent) ~> routes ~> check {
+            status should equal (BadRequest)
+          }
+        }
+        
+        it("Should reject the request if the wrong field type is used") {
+          val jsonContent = """{"title": []}""".asJson.asJsObject
+          Put("/crags/burbage", jsonContent) ~> routes ~> check {
+            status should equal (BadRequest)
+          }
+        }
       }
     }
   }
@@ -117,4 +170,15 @@ class ServiceTest extends FunSpec
     Unmarshaller.delegate[String, JsObject](`application/json`, `application/hal+json`) { string =>
       string.asJson.asJsObject
     }
+
+  implicit private val JsonMarshaller: Marshaller[JsObject] =
+    Marshaller.delegate[JsObject, String](`application/json`) { value =>
+      PrettyPrinter(value)
+    }
+
+  implicit private val BadJsonMarshaller: Marshaller[Int] =
+    Marshaller.delegate[Int, String](`application/json`) { value =>
+      value.toString
+    }
+
 }

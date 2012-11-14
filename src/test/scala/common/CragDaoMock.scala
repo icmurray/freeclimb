@@ -10,24 +10,29 @@ import freeclimb.sql.CragDao
 class CragDaoMock extends CragDao {
 
   private var revision: Long = 0L
-  private var crags: Set[Revisioned[Crag]] = Set()
+  private var crags: Map[String, Revisioned[Crag]] = Map()
 
   reset()
 
   override def create(crag: Crag) = ApiAction { session =>
-    revision += 1
-    val rev = Revisioned(revision, crag)
-    crags += rev
-    created(crag, revision).right
+
+    if (crags.contains(crag.name)) {
+      EditConflict().left
+    } else {
+      revision += 1
+      val rev = Revisioned(revision, crag)
+      crags += crag.name -> rev
+      created(crag, revision).right
+    }
   }
 
   override def getOption(name: String) = ApiReadAction { session =>
-    crags.find(c => c.model.name == name).right
+    crags.get(name).right
   }
 
   def reset() {
     revision = 0L
-    crags = Set()
+    crags = Map()
   }
 
 }
