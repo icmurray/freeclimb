@@ -39,7 +39,17 @@ trait Routes extends HttpService {
         runner.run { api.getCragOption(cragName) }.fold(
           failure => complete(handleActionFailure(failure)),
           success => success map { crag =>
-              respondWithHeader(RawHeader("ETag", crag.revision.toString)) {complete(crag) }
+
+              respondWithHeader(RawHeader("ETag", crag.revision.toString)) {
+
+                headerValue[String](ifNoneMatch) { revision =>
+                  if (revision  == crag.revision.toString) {
+                    complete(HttpResponse(StatusCodes.NotModified))
+                  } else {
+                    reject
+                  }
+                } ~ complete(crag) 
+              }
             } getOrElse complete(HttpResponse(StatusCodes.NotFound))
         )
       } ~
@@ -62,6 +72,11 @@ trait Routes extends HttpService {
         )}
       }
     }
+  }
+
+  private def ifNoneMatch(header: HttpHeader): Option[String] = header.lowercaseName match {
+    case "if-none-match" => Some(header.value)
+    case _               => None
   }
 
   private def resourceToCragRevision(resourceD: Disj[RevisionedCragResource], cragName: String) = {

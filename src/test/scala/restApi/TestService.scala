@@ -80,11 +80,24 @@ class ServiceTest extends FunSpec
         }
 
         it("Should 304 (Not Modified) if given a matching ETag in If-None-Match") {
+          Get("/crags/burbage") ~> addHeader("If-None-Match", "1") ~> routes ~> check {
+            status should equal (NotModified)
 
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
         }
 
-        it("Should 200 if ETag does not match") (pending)
+        it("Should 200 if ETag does not match") {
+          Get("/crags/burbage") ~> addHeader("If-None-Match", "0") ~> routes ~> check {
+            status should equal (OK)
 
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
       }
 
       describe("PUT-ing a new resource") {
