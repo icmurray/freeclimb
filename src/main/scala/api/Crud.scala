@@ -56,6 +56,7 @@ trait CrudApi {
   def deleteCrag(crag: Revisioned[Crag]) = cragDao.delete(crag)
   def getCrag(name: String)              = cragDao.get(name)
   def getCragOption(name: String)        = cragDao.getOption(name)
+  def listCrags()                        = cragDao.list()
 
   def updateCrag(crag: Revisioned[Crag], name: String): ApiUpdateAction[Revisioned[Crag]] = {
     if (name == crag.model.name) {

@@ -51,6 +51,28 @@ class CragDaoTest extends FunSpec
 
   describe("Crag DAO") {
 
+    describe("The list action") {
+      it("should return all current crags") {
+        // Create a few crags, and delete one too
+        val (stanage, higgar) = run {
+          for {
+            burbRev <- cragDao.create(burbage)
+            stanage <- cragDao.create(Crag.makeUnsafe("stanage", "Stanage"))
+            higgar  <- cragDao.create(Crag.makeUnsafe("higgar-tor", "Higgar Tor"))
+            _       <- cragDao.delete(burbRev)
+          } yield (stanage, higgar)
+        } getOrElse fail("Unable to create test fixtures")
+
+        val allCrags = run {
+          cragDao.list()
+        } getOrElse fail("Unable to list Crags")
+
+        allCrags should contain (stanage.model)
+        allCrags should contain (higgar.model)
+        allCrags should not contain (burbage)
+      }
+    }
+
     describe("The get action") {
 
       it("should return the latest revision of a crag that exists") {

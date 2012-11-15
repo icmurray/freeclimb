@@ -158,6 +158,21 @@ trait CragDao extends Repository[Crag]
     }
   } yield result
 
+  /**
+   * Crag listing.
+   *
+   * May just be a temporary method, as it lists **all** Crags.
+   */
+  def list(): ApiReadAction[List[Crag]] = ApiReadAction { session =>
+    implicit val connection = session.dbConnection
+
+    SQL(
+      """
+      SELECT name, title FROM crags
+      """
+    ).as(crag("crags") *).right
+  }
+
   def getOption(name: String): ApiReadAction[Option[Revisioned[Crag]]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
 
