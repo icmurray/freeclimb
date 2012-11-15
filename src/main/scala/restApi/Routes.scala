@@ -43,6 +43,13 @@ trait Routes extends HttpService {
         )
       }
     } ~
+    path("crags") {
+      get {
+        run(api.listCrags()) { crags =>
+          complete(crags)
+        }
+      }
+    } ~
     path("crags" / slug) { cragName =>
       get {
         run(api.getCragOption(cragName)) { success =>

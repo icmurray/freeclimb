@@ -34,6 +34,7 @@ trait ModelMarshallers { this: MimeTypes =>
 
   implicit val cragMarshaller = modelMarshaller[Crag]
   implicit val revisionedCragMarshaller = modelMarshaller[Revisioned[Crag]]
+  implicit val cragListingMarshaller = modelMarshaller[List[Crag]]
   implicit val climbMarshaller = modelMarshaller[Climb]
   implicit val revisionedClimbMarshaller = modelMarshaller[Revisioned[Climb]]
 
@@ -41,7 +42,7 @@ trait ModelMarshallers { this: MimeTypes =>
     Marshaller.delegate[T, String](`application/json`, `application/hal+json`) { value =>
       printer(value.toJson)
     }
-  
+ 
   implicit val errorMapMarshaller: Marshaller[Map[String,NonEmptyList[String]]] =
     Marshaller.delegate[Map[String,NonEmptyList[String]], String](`application/json`, `application/hal+json`) { value =>
       printer(value.mapValues(_.toList).toJson)

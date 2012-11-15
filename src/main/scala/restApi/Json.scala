@@ -89,6 +89,18 @@ trait CragJson {
     override protected def embedded(crag: Crag) = Map[String, JsValue]().toJson.asJsObject
 
   }
+
+  implicit object CragListingJsonWriter extends RootJsonWriter[List[Crag]] {
+    def write(crags: List[Crag]) = {
+      Map("count" -> crags.length).toJson.asJsObject |+| linksRepr |+| embeddedRepr(crags)
+    }
+
+    private def linksRepr = JsObject("_links" -> Map("self" -> Link.listCrags).toJson)
+    private def embeddedRepr(crags: List[Crag]) = JsObject(
+      "_embedded" -> JsObject("crags" -> JsArray(crags map (_.toJson)))
+    )
+  }
+
 }
 
 trait ClimbJson { self: CragJson =>
