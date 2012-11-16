@@ -35,6 +35,39 @@ class ServiceTest extends FunSpec
   }
 
   describe("The Service") {
+
+    describe("/crags") {
+      it("Should list all available Crags") {
+        Get("/crags") ~> routes ~> check {
+          status should equal (OK)
+          val json = entityAs[JsObject]
+          val count = json.fields.get("count") map { _.asInstanceOf[JsNumber].value }
+
+          count should equal (Some(1))
+        }
+      }
+      
+      it("Should list new Crags when created") {
+        Get("/crags") ~> routes ~> check {
+          status should equal (OK)
+          val json = entityAs[JsObject]
+          val count = json.fields.get("count") map { _.asInstanceOf[JsNumber].value }
+
+          count should equal (Some(1))
+        }
+
+        runner.run { api.createCrag(Crag.makeUnsafe("stanage", "Stanage")) }
+        
+        Get("/crags") ~> routes ~> check {
+          status should equal (OK)
+          val json = entityAs[JsObject]
+          val count = json.fields.get("count") map { _.asInstanceOf[JsNumber].value }
+
+          count should equal (Some(2))
+        }
+      }
+    }
+
     describe("/crags/<crag>") {
       describe("GET-ing a crag resource") {
 

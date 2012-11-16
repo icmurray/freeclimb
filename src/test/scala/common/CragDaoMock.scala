@@ -31,7 +31,7 @@ class CragDaoMock extends CragDao {
   }
 
   override def list() = ApiReadAction { session =>
-    crags.mapValues { _.model }
+    crags.values.toList map { _.model } right
   }
 
   def reset() {

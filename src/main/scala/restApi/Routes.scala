@@ -45,8 +45,10 @@ trait Routes extends HttpService {
     } ~
     path("crags") {
       get {
-        run(api.listCrags()) { crags =>
-          complete(crags)
+        dynamic {
+          run(api.listCrags()) { crags =>
+            complete(crags)
+          }
         }
       }
     } ~
