@@ -36,7 +36,7 @@ class ServiceTest extends FunSpec
 
   describe("The Service") {
     describe("/crags/<crag>") {
-      describe("GET-ing a crag resource") {
+      describe("GET") {
 
         it("Should 404 if the crag does not exist") {
           Get("/crags/does-not-exist") ~> routes ~> check {
@@ -102,38 +102,16 @@ class ServiceTest extends FunSpec
         }
       }
 
-      describe("PUT-ing a new resource") {
-        it("Should create a new Crag if one doesn't exist already") {
+      describe("PUT") {
+
+        it("Should require either the If-None-Match or If-Match header") {
           val jsonContent = """{"title": "Stanage Edge"}""".asJson.asJsObject
-          Put("/crags/stanage", jsonContent) ~> routes ~> check {
-            status should equal (Created)
+          Put("/crags/stanage", jsonContent) ~>
+            routes ~> check {
+            status should equal (PreconditionRequired)
           }
-
-          Get("/crags/stanage") ~> routes ~> check {
-            status should equal (OK)
-
-            val json = entityAs[JsObject]
-
-            val name = json.fields.get("name")
-            name should not equal (None)
-            name.get.asInstanceOf[JsString].value should equal("stanage")
-
-            val title = json.fields.get("title")
-            title should not equal (None)
-            title.get.asInstanceOf[JsString].value should equal("Stanage Edge")
-          }
-
         }
-
-        it("Should require either the If-None-Match or If-Match header") (pending)
         
-        it("Should reject the request if the Crag already exists") {
-          val jsonContent = """{"title": "Burbage Edge"}""".asJson.asJsObject
-          Put("/crags/burbage", jsonContent) ~> routes ~> check {
-            status should equal (Conflict)
-          }
-        }
-
         it("Should reject the request if the Crag is invalid") {
           val jsonContent = """{"title": ""}""".asJson.asJsObject
           Put("/crags/burbage", jsonContent) ~> routes ~> check {
@@ -160,6 +138,72 @@ class ServiceTest extends FunSpec
             status should equal (BadRequest)
           }
         }
+        
+        describe("Creation") {
+
+          it("Should create a new Crag if one doesn't exist already") {
+            val jsonContent = """{"title": "Stanage Edge"}""".asJson.asJsObject
+            Put("/crags/stanage", jsonContent) ~>
+              addHeader("If-None-Match", "*") ~> 
+              routes ~> check {
+              status should equal (Created)
+            }
+
+            Get("/crags/stanage") ~> routes ~> check {
+              status should equal (OK)
+
+              val json = entityAs[JsObject]
+
+              val name = json.fields.get("name")
+              name should not equal (None)
+              name.get.asInstanceOf[JsString].value should equal("stanage")
+
+              val title = json.fields.get("title")
+              title should not equal (None)
+              title.get.asInstanceOf[JsString].value should equal("Stanage Edge")
+            }
+
+          }
+
+          it("Should reject the request if the Crag already exists") {
+            val jsonContent = """{"title": "Burbage Edge"}""".asJson.asJsObject
+            Put("/crags/burbage", jsonContent) ~>
+              addHeader("If-None-Match", "*") ~> 
+              routes ~> check {
+              status should equal (PreconditionFailed)
+            }
+          }
+        }
+
+        describe("Updating") {
+          it("Should update an existing Crag if revision is current") {
+            val jsonContent = """{"title": "Burbage Edge Title Updated"}""".asJson.asJsObject
+            Put("/crags/burbage", jsonContent) ~>
+              addHeader("If-Match", "1") ~> 
+              routes ~> check {
+              status should equal (OK)
+            }
+          }
+
+          it("Should reject the request if the revision to not up to date") {
+            val jsonContent = """{"title": "Burbage Edge Title Updated"}""".asJson.asJsObject
+            Put("/crags/burbage", jsonContent) ~>
+              addHeader("If-Match", "0") ~> 
+              routes ~> check {
+              status should equal (PreconditionFailed)
+            }
+          }
+
+          it("Should 404 if the Crag does not exist") {
+            val jsonContent = """{"title": "Burbage Edge Title Updated"}""".asJson.asJsObject
+            Put("/crags/stanage", jsonContent) ~>
+              addHeader("If-Match", "0") ~> 
+              routes ~> check {
+              status should equal (NotFound)
+            }
+          }
+        }
+
       }
     }
   }

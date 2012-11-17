@@ -66,38 +66,47 @@ trait Routes extends HttpService {
           } getOrElse complete(HttpResponse(StatusCodes.NotFound))
         }
       } ~
-      //put {
-      //  entity(as[Disj[RevisionedCragResource]]) { resourceToCragRevision(_, cragName).fold(
-      //    errors   => complete(StatusCodes.BadRequest, errors),
-      //    revision => runner.run { api.updateCrag(revision) }.fold(
-      //      failure     => complete(handleActionFailure(failure)),
-      //      newRevision => complete(newRevision)
-      //    )
-      //  )}
-      //} ~
       put {
         entity(as[Disj[CragResource]]) { resourceToCrag(_, cragName).fold(
           errors => complete(StatusCodes.BadRequest, errors),
-          crag   => runner.run { api.createCrag(crag) }.fold(
-            failure  => complete(handleActionFailure(failure)),
-            revision => complete(StatusCodes.Created, revision)
-          )
+
+          crag   => {
+            headerValue(resourceCreation) { _ =>
+              runner.run { api.createCrag(crag) }.fold(
+                  failure  => complete(handleActionFailure(failure)),
+                  revision => complete(StatusCodes.Created, revision)
+              )
+            } ~
+            headerValue(resourceUpdate) { revision =>
+              val currentRevision = Revisioned[Crag](revision, crag)
+              runner.run { api.updateCrag(currentRevision) }.fold(
+                failure     => complete(handleActionFailure(failure)),
+                newRevision => complete(newRevision)
+              )
+            } ~ complete(StatusCodes.PreconditionRequired, """
+                  Make request with 'If-None-Match: *' header to create a new Crag
+                  Make request with 'If-Match: <rev>' header to update an existing Crag""")
+          }
+
         )}
       }
     }
   }
 
+  private def resourceCreation(header: HttpHeader): Option[String] = header.lowercaseName match {
+    case "if-none-match" if header.value == "*" => Some(header.value)
+    case _                                      => None
+  }
+
+  private def resourceUpdate(header: HttpHeader): Option[Long] = header.lowercaseName match {
+    case "if-match" => try { Some(header.value.toLong) } catch { case _ => None }
+    case _          => None
+  }
+
+  // TODO:  If-None-Match could contain a list of revisions.
   private def ifNoneMatch(header: HttpHeader): Option[String] = header.lowercaseName match {
     case "if-none-match" => Some(header.value)
     case _               => None
-  }
-
-  private def resourceToCragRevision(resourceD: Disj[RevisionedCragResource], cragName: String) = {
-    resourceD >>= { resource: RevisionedCragResource =>
-      Crag(cragName, resource.title) map { crag: Crag =>
-        Revisioned[Crag](resource.revision.longValue, crag)
-      }
-    }
   }
 
   private def resourceToCrag(resourceDisjunction: Disj[CragResource], cragName: String) = {
@@ -108,7 +117,7 @@ trait Routes extends HttpService {
 
   private def handleActionFailure(f: ActionFailure) = f match {
     case ValidationError() => HttpResponse(StatusCodes.BadRequest)
-    case EditConflict()    => HttpResponse(StatusCodes.Conflict)
+    case EditConflict()    => HttpResponse(StatusCodes.PreconditionFailed)
     case NotFound()        => HttpResponse(StatusCodes.NotFound)
     case NotImplemented()  => HttpResponse(StatusCodes.NotImplemented)
   }

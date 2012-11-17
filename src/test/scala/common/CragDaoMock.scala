@@ -31,7 +31,23 @@ class CragDaoMock extends CragDao {
   }
 
   override def list() = ApiReadAction { session =>
-    crags.mapValues { _.model }
+    crags.values.toList map { _.model } right
+  }
+
+  override def update(rev: Revisioned[Crag]) = ApiAction { session =>
+    val name = rev.model.name
+    if (crags.contains(name)) {
+      val currentRev = crags.get(name).get
+      if (currentRev.revision == rev.revision) {
+        revision += 1
+        crags += name -> rev
+        updated(rev.model, revision).right
+      } else {
+        EditConflict().left
+      }
+    } else {
+      NotFound().left
+    }
   }
 
   def reset() {
