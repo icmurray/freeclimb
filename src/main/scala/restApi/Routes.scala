@@ -35,12 +35,20 @@ trait Routes extends HttpService {
   }
 
   lazy val routes = {
-    path("crags" / slug / "climbs" / slug) { (cragName, climbName) =>
+
+    path("climbs" / slug / slug ) { (cragName, climbName) =>
       get {
-        runner.run { api.getClimbOption(cragName, climbName) }.fold(
-          f       => complete(handleActionFailure(f)),
-          success => success map {complete(_) } getOrElse complete(HttpResponse(StatusCodes.NotFound))
-        )
+        run(api.getClimbOption(cragName, climbName)) { success =>
+          success map { climb =>
+            respondWithHeader(ETag(climb.revision.toString)) {
+              headerValue(ifNoneMatch) { revision =>
+                if (revision  == climb.revision.toString) {
+                  complete(HttpResponse(StatusCodes.NotModified))
+                } else { reject }
+              } ~ complete(climb) 
+            }
+          } getOrElse complete(HttpResponse(StatusCodes.NotFound))
+        }
       }
     } ~
     path("crags") {

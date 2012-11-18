@@ -206,9 +206,94 @@ class ServiceTest extends FunSpec
 
       }
     }
+
+    describe("climbs/crag/<climb>") {
+      describe("GET") {
+
+        it("Should 404 if the climb does not exist") {
+          Get("/climbs/burbage/does-not-exist") ~> routes ~> check {
+            status should equal (NotFound)
+          }
+        }
+
+        it("Should 404 if the crag does not exist") {
+          Get("/climbs/does-not-exist/long-tall-sally") ~> routes ~> check {
+            status should equal (NotFound)
+          }
+        }
+
+        it("Should 200 if the climb exists") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            status should equal (OK)
+          }
+        }
+
+        it("Should contain the revision in the ETag header") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
+
+        it("Should contain the revision in the representation") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            val json = entityAs[JsObject]
+            val revision = json.fields.get("revision")
+            revision should not equal (None)
+            revision.get.asInstanceOf[JsNumber].value should equal (1L)
+          }
+        }
+
+        it("Should describe the requested climb as JSON") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            val json = entityAs[JsObject]
+
+            val name = json.fields.get("name")
+            name should not equal (None)
+            name.get.asInstanceOf[JsString].value should equal(longTallSally.name)
+
+            val title = json.fields.get("title")
+            title should not equal (None)
+            title.get.asInstanceOf[JsString].value should equal(longTallSally.title)
+          }
+        }
+
+        it("Should 304 (Not Modified) if given a matching ETag in If-None-Match") {
+          Get("/crags/burbage/long-tall-sally") ~>
+              addHeader("If-None-Match", "1") ~>
+              routes ~> check {
+            status should equal (NotModified)
+
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
+
+        it("Should 200 if ETag does not match") {
+          Get("/crags/burbage/long-tall-sally") ~>
+              addHeader("If-None-Match", "0") ~>
+              routes ~> check {
+            status should equal (OK)
+
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
+      }
+    }
+
   }
 
   private def burbage = Crag.makeUnsafe("burbage", "Burbage")
+  private def longTallSally = Climb.makeUnsafe(
+    "long-tall-sally",
+    "Long Tall Sally",
+    "Long Tall Sally description",
+    burbage,
+    UkTrad(Grade.UkAdjective.E1, Grade.UkTechnical.T5b))
 
   implicit private val JsonUnmarshaller: Unmarshaller[JsObject] =
     Unmarshaller.delegate[String, JsObject](`application/json`, `application/hal+json`) { string =>
