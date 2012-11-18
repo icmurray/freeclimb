@@ -95,7 +95,7 @@ trait CragJson {
       Map("count" -> crags.length).toJson.asJsObject |+| linksRepr |+| embeddedRepr(crags)
     }
 
-    private def linksRepr = JsObject("_links" -> Map("self" -> Link.listCrags).toJson)
+    private def linksRepr = JsObject("_links" -> Map("self" -> Link.crags).toJson)
     private def embeddedRepr(crags: List[Crag]) = JsObject(
       "_embedded" -> JsObject("crags" -> JsArray(crags map (_.toJson)))
     )
