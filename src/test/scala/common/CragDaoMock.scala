@@ -50,6 +50,13 @@ class CragDaoMock extends CragDao {
     }
   }
 
+  override def history(crag: Crag) = TODO
+  override def deletedList() = TODO
+  override def purge(crag: Revisioned[Crag]) = TODO
+  override def delete(crag: Revisioned[Crag]) = TODO
+
+  private def TODO: Nothing = throw new UnsupportedOperationException("Not implemented")
+
   def reset() {
     revision = 0L
     crags = Map()
