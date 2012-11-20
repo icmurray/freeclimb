@@ -69,7 +69,7 @@ class ServiceTest extends FunSpec
     }
 
     describe("/crags/<crag>") {
-      describe("GET-ing a crag resource") {
+      describe("GET") {
 
         it("Should 404 if the crag does not exist") {
           Get("/crags/does-not-exist") ~> routes ~> check {
@@ -135,38 +135,16 @@ class ServiceTest extends FunSpec
         }
       }
 
-      describe("PUT-ing a new resource") {
-        it("Should create a new Crag if one doesn't exist already") {
+      describe("PUT") {
+
+        it("Should require either the If-None-Match or If-Match header") {
           val jsonContent = """{"title": "Stanage Edge"}""".asJson.asJsObject
-          Put("/crags/stanage", jsonContent) ~> routes ~> check {
-            status should equal (Created)
+          Put("/crags/stanage", jsonContent) ~>
+            routes ~> check {
+            status should equal (PreconditionRequired)
           }
-
-          Get("/crags/stanage") ~> routes ~> check {
-            status should equal (OK)
-
-            val json = entityAs[JsObject]
-
-            val name = json.fields.get("name")
-            name should not equal (None)
-            name.get.asInstanceOf[JsString].value should equal("stanage")
-
-            val title = json.fields.get("title")
-            title should not equal (None)
-            title.get.asInstanceOf[JsString].value should equal("Stanage Edge")
-          }
-
         }
-
-        it("Should require either the If-None-Match or If-Match header") (pending)
         
-        it("Should reject the request if the Crag already exists") {
-          val jsonContent = """{"title": "Burbage Edge"}""".asJson.asJsObject
-          Put("/crags/burbage", jsonContent) ~> routes ~> check {
-            status should equal (Conflict)
-          }
-        }
-
         it("Should reject the request if the Crag is invalid") {
           val jsonContent = """{"title": ""}""".asJson.asJsObject
           Put("/crags/burbage", jsonContent) ~> routes ~> check {
@@ -193,11 +171,162 @@ class ServiceTest extends FunSpec
             status should equal (BadRequest)
           }
         }
+        
+        describe("Creation") {
+
+          it("Should create a new Crag if one doesn't exist already") {
+            val jsonContent = """{"title": "Stanage Edge"}""".asJson.asJsObject
+            Put("/crags/stanage", jsonContent) ~>
+              addHeader("If-None-Match", "*") ~> 
+              routes ~> check {
+              status should equal (Created)
+            }
+
+            Get("/crags/stanage") ~> routes ~> check {
+              status should equal (OK)
+
+              val json = entityAs[JsObject]
+
+              val name = json.fields.get("name")
+              name should not equal (None)
+              name.get.asInstanceOf[JsString].value should equal("stanage")
+
+              val title = json.fields.get("title")
+              title should not equal (None)
+              title.get.asInstanceOf[JsString].value should equal("Stanage Edge")
+            }
+
+          }
+
+          it("Should reject the request if the Crag already exists") {
+            val jsonContent = """{"title": "Burbage Edge"}""".asJson.asJsObject
+            Put("/crags/burbage", jsonContent) ~>
+              addHeader("If-None-Match", "*") ~> 
+              routes ~> check {
+              status should equal (PreconditionFailed)
+            }
+          }
+        }
+
+        describe("Updating") {
+          it("Should update an existing Crag if revision is current") {
+            val jsonContent = """{"title": "Burbage Edge Title Updated"}""".asJson.asJsObject
+            Put("/crags/burbage", jsonContent) ~>
+              addHeader("If-Match", "1") ~> 
+              routes ~> check {
+              status should equal (OK)
+            }
+          }
+
+          it("Should reject the request if the revision to not up to date") {
+            val jsonContent = """{"title": "Burbage Edge Title Updated"}""".asJson.asJsObject
+            Put("/crags/burbage", jsonContent) ~>
+              addHeader("If-Match", "0") ~> 
+              routes ~> check {
+              status should equal (PreconditionFailed)
+            }
+          }
+
+          it("Should 404 if the Crag does not exist") {
+            val jsonContent = """{"title": "Burbage Edge Title Updated"}""".asJson.asJsObject
+            Put("/crags/stanage", jsonContent) ~>
+              addHeader("If-Match", "0") ~> 
+              routes ~> check {
+              status should equal (NotFound)
+            }
+          }
+        }
+
       }
     }
+
+    describe("climbs/crag/<climb>") {
+      describe("GET") {
+
+        it("Should 404 if the climb does not exist") {
+          Get("/climbs/burbage/does-not-exist") ~> routes ~> check {
+            status should equal (NotFound)
+          }
+        }
+
+        it("Should 404 if the crag does not exist") {
+          Get("/climbs/does-not-exist/long-tall-sally") ~> routes ~> check {
+            status should equal (NotFound)
+          }
+        }
+
+        it("Should 200 if the climb exists") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            status should equal (OK)
+          }
+        }
+
+        it("Should contain the revision in the ETag header") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
+
+        it("Should contain the revision in the representation") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            val json = entityAs[JsObject]
+            val revision = json.fields.get("revision")
+            revision should not equal (None)
+            revision.get.asInstanceOf[JsNumber].value should equal (1L)
+          }
+        }
+
+        it("Should describe the requested climb as JSON") {
+          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+            val json = entityAs[JsObject]
+
+            val name = json.fields.get("name")
+            name should not equal (None)
+            name.get.asInstanceOf[JsString].value should equal(longTallSally.name)
+
+            val title = json.fields.get("title")
+            title should not equal (None)
+            title.get.asInstanceOf[JsString].value should equal(longTallSally.title)
+          }
+        }
+
+        it("Should 304 (Not Modified) if given a matching ETag in If-None-Match") {
+          Get("/crags/burbage/long-tall-sally") ~>
+              addHeader("If-None-Match", "1") ~>
+              routes ~> check {
+            status should equal (NotModified)
+
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
+
+        it("Should 200 if ETag does not match") {
+          Get("/crags/burbage/long-tall-sally") ~>
+              addHeader("If-None-Match", "0") ~>
+              routes ~> check {
+            status should equal (OK)
+
+            val etag = header("ETag")
+            etag should not equal (None)
+            etag.get.value.toLong should equal (1L)
+          }
+        }
+      }
+    }
+
   }
 
   private def burbage = Crag.makeUnsafe("burbage", "Burbage")
+  private def longTallSally = Climb.makeUnsafe(
+    "long-tall-sally",
+    "Long Tall Sally",
+    "Long Tall Sally description",
+    burbage,
+    UkTrad(Grade.UkAdjective.E1, Grade.UkTechnical.T5b))
 
   implicit private val JsonUnmarshaller: Unmarshaller[JsObject] =
     Unmarshaller.delegate[String, JsObject](`application/json`, `application/hal+json`) { string =>

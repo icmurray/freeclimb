@@ -13,15 +13,48 @@ import freeclimb.models._
 
 import freeclimb.sql.SqlError._
 
-object CragDao extends CragDao
+trait CragDao extends Repository[Crag] {
+  
+  def get(name: String): ApiReadAction[Revisioned[Crag]] = for {
+    optionRev <- getOption(name)
+    result <- optionRev match {
+      case None      => ApiReadAction.pure(NotFound().left)
+      case Some(rev) => ApiReadAction.pure(rev.right)
+    }
+  } yield result
+
+  def getOption(name: String): ApiReadAction[Option[Revisioned[Crag]]]
+  def list(): ApiReadAction[List[Crag]]
+  def history(crag: Crag): ApiReadAction[Seq[Revisioned[Crag]]]
+  def deletedList(): ApiReadAction[Seq[Revisioned[Crag]]]
+
+  /*** Some helper functions that are useful to CragDao implementations ***/
+  protected def created(crag: Crag, revision: Long) = {
+    val rev = Revisioned[Crag](revision, crag)
+    (List(CragCreated(rev)), rev)
+  }
+
+  protected def updated(crag: Crag, revision: Long) = {
+    val rev = Revisioned[Crag](revision, crag)
+    (List(CragUpdated(rev)), rev)
+  }
+
+  protected def deleted(rev: Revisioned[Crag]) = {
+    (List(CragDeleted(rev)), rev)
+  }
+
+  protected def purged(rev: Revisioned[Crag]) = {
+    (List(CragPurged(rev)), rev)
+  }
+}
 
 /**
  * The Data Access Object for Crags.
  *
  * Defines lower-level domai-model access for Crags.  Mostly CRUD.
  */
-trait CragDao extends Repository[Crag]
-                 with Dao {
+object CragDao extends CragDao
+                  with Dao {
 
   override def create(crag: Crag) = ApiAction { session =>
     implicit val connection = session.dbConnection
@@ -150,20 +183,12 @@ trait CragDao extends Repository[Crag]
 
   }
 
-  def get(name: String): ApiReadAction[Revisioned[Crag]] = for {
-    optionRev <- getOption(name)
-    result <- optionRev match {
-      case None      => ApiReadAction.pure(NotFound().left)
-      case Some(rev) => ApiReadAction.pure(rev.right)
-    }
-  } yield result
-
   /**
    * Crag listing.
    *
    * May just be a temporary method, as it lists **all** Crags.
    */
-  def list(): ApiReadAction[List[Crag]] = ApiReadAction { session =>
+  override def list(): ApiReadAction[List[Crag]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
 
     SQL(
@@ -173,7 +198,7 @@ trait CragDao extends Repository[Crag]
     ).as(crag("crags") *).right
   }
 
-  def getOption(name: String): ApiReadAction[Option[Revisioned[Crag]]] = ApiReadAction { session =>
+  override def getOption(name: String): ApiReadAction[Option[Revisioned[Crag]]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
 
     SQL(
@@ -186,7 +211,7 @@ trait CragDao extends Repository[Crag]
     ).as(revisionedCrag("crags").singleOpt).right
   }
 
-  def history(crag: Crag): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
+  override def history(crag: Crag): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
     SQL(
       """
@@ -200,7 +225,7 @@ trait CragDao extends Repository[Crag]
     ).as(revisionedCrag("crag_history") *).right
   }
 
-  def deletedList(): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
+  override def deletedList(): ApiReadAction[Seq[Revisioned[Crag]]] = ApiReadAction { session =>
     implicit val connection = session.dbConnection
     SQL(
       """
@@ -211,24 +236,6 @@ trait CragDao extends Repository[Crag]
         ORDER BY h.crag_id, h.revision DESC
       """
     ).as(revisionedCrag("crag_history") *).right
-  }
-
-  protected def created(crag: Crag, revision: Long) = {
-    val rev = Revisioned[Crag](revision, crag)
-    (List(CragCreated(rev)), rev)
-  }
-
-  protected def updated(crag: Crag, revision: Long) = {
-    val rev = Revisioned[Crag](revision, crag)
-    (List(CragUpdated(rev)), rev)
-  }
-
-  protected def deleted(rev: Revisioned[Crag]) = {
-    (List(CragDeleted(rev)), rev)
-  }
-
-  protected def purged(rev: Revisioned[Crag]) = {
-    (List(CragPurged(rev)), rev)
   }
 }
 
