@@ -116,6 +116,7 @@ class CragDaoMock extends CragDao {
 class CragDaoMockTest extends CragDaoSpec {
 
   override protected val cragDao = new CragDaoMock()
+  override protected val climbDao = null
   override protected val runner = new ActionRunner {
     def run[M[+_],A,I <: IsolationLevel, W <: List[ActionEvent]](action: ActionT[M,A,I,W])
                                                                 (implicit F: Failable[M[_]], M: Functor[M], m: Manifest[I]): M[A] = {

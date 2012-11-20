@@ -25,6 +25,7 @@ trait CragDaoSpec extends FunSpec
                     with ShouldMatchers {
 
   protected def cragDao: CragDao
+  protected def climbDao: ClimbDao
   protected def runner: ActionRunner
   protected def cleanDao(): Unit
 
@@ -312,7 +313,7 @@ trait CragDaoSpec extends FunSpec
         val result = run {
           for {
             rev1 <- cragDao.create(burbage)
-            _    <- ClimbDao.create(harvest)
+            _    <- climbDao.create(harvest)
             rev2 <- cragDao.get("burbage")
             res  <- cragDao.delete(rev2)
           } yield res
@@ -498,7 +499,7 @@ trait CragDaoSpec extends FunSpec
         val result = run {
           for {
             rev1 <- cragDao.create(burbage)
-            _    <- ClimbDao.create(harvest)
+            _    <- climbDao.create(harvest)
             rev2 <- cragDao.get("burbage")
             res  <- cragDao.purge(rev2)
           } yield res
@@ -525,6 +526,7 @@ trait CragDaoSpec extends FunSpec
 class CragDaoTest extends CragDaoSpec {
 
   override protected val cragDao = CragDao
+  override protected val climbDao = ClimbDao
   override protected val runner = new DefaultActionRunner(TestDatabaseSessions.source)
 
   override protected def cleanDao() {
