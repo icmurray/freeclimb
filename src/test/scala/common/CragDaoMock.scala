@@ -31,12 +31,6 @@ class CragDaoMock(db: FakeDb) extends CragDao {
 
 class CragDaoMockTest extends CragDaoSpec {
 
-  private var db = new FakeDb()
-  private var _cragDao = new CragDaoMock(db)
-  private var _climbDao = new FakeClimbDao(db)
-
-  override protected def cragDao = _cragDao
-  override protected def climbDao = _climbDao
   override protected val runner = new ActionRunner {
     def run[M[+_],A,I <: IsolationLevel, W <: List[ActionEvent]](action: ActionT[M,A,I,W])
                                                                 (implicit F: Failable[M[_]], M: Functor[M], m: Manifest[I]): M[A] = {
@@ -48,10 +42,17 @@ class CragDaoMockTest extends CragDaoSpec {
     }
   }
 
-  override def cleanDao() {
-    db = new FakeDb()
-    _cragDao = new CragDaoMock(db)
-    _climbDao = new FakeClimbDao(db)
+  override def withCragDao(testCode: CragDao => Any) {
+    val db = new FakeDb()
+    val cragDao = new CragDaoMock(db)
+    testCode(cragDao)
+  }
+
+  override def withCragAndClimbDaos(testCode: (CragDao, ClimbDao) => Any) {
+    val db = new FakeDb()
+    val cragDao = new CragDaoMock(db)
+    val climbDao = new FakeClimbDao(db)
+    testCode(cragDao, climbDao)
   }
 
 }
