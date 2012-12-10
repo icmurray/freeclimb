@@ -9,114 +9,34 @@ import freeclimb.sql._
 
 import freeclimb.test.sql.CragDaoSpec
 
-class CragDaoMock extends CragDao {
+class CragDaoMock(db: FakeDb) extends CragDao {
 
+  override def create(crag: Crag) = db.createCrag(crag)
 
-  private var revision: Long = 0L
-  private var crags: Map[String, NonEmptyList[Revisioned[Crag]]] = Map()
-  private var deletedCrags: Map[String, Revisioned[Crag]] = Map()
+  override def getOption(name: String) = db.getOption(name)
 
-  reset()
+  override def list() = db.listCrags
 
-  override def create(crag: Crag) = ApiAction { session =>
+  override def update(rev: Revisioned[Crag]) = db.updateCrag(rev)
 
-    if (crags.contains(crag.name)) {
-      EditConflict().left
-    } else {
-      revision += 1
-      val rev = Revisioned(revision, crag)
-      crags += crag.name -> NonEmptyList(rev)
-      created(crag, revision).right
-    }
-  }
+  override def history(crag: Crag) = db.history(crag)
 
-  override def getOption(name: String) = ApiReadAction { session =>
-    crags.get(name) map { _.head } right
-  }
+  override def deletedList() = db.deletedList
 
-  override def list() = ApiReadAction { session =>
-    crags.values.toList map { _.head.model } right
-  }
+  override def purge(crag: Revisioned[Crag]) = db.purgeCrag(crag)
 
-  override def update(rev: Revisioned[Crag]) = ApiAction { session =>
-    val name = rev.model.name
-    if (crags.contains(name)) {
-      val currentRev = crags(name).head
-
-      if (currentRev.revision == rev.revision) {
-        revision += 1
-        val tail: List[Revisioned[Crag]] = if (currentRev.model == rev.model) {
-          crags(name).tail.toList
-        } else {
-          crags(name).toList
-        }
-
-        crags += name -> NonEmptyList(Revisioned[Crag](revision, rev.model), tail: _*)
-        updated(rev.model, revision).right
-      } else {
-        EditConflict().left
-      }
-    } else {
-      NotFound().left
-    }
-  }
-
-  override def history(crag: Crag) = ApiReadAction { session =>
-    val name = crag.name
-    crags.get(name) map { _.toList.right } getOrElse List().right
-  }
-
-  override def deletedList() = ApiReadAction { session =>
-    deletedCrags.values.toList.right
-  }
-
-  override def purge(crag: Revisioned[Crag]) = ApiAction { session =>
-    val name = crag.model.name
-    if (crags contains name) {
-
-      if (crags(name).head.revision != crag.revision) {
-        EditConflict().left
-      } else {
-        crags -= name
-        deletedCrags -= name
-        purged(crag).right
-      }
-    } else {
-      NotFound().left
-    }
-  }
-
-  override def delete(crag: Revisioned[Crag]) = ApiAction { session =>
-    val name = crag.model.name
-    if (crags contains name) {
-      val rev = crags(name).head
-
-      if (rev.revision != crag.revision) {
-        EditConflict().left
-      } else {
-        deletedCrags += name -> crags(name).head
-        crags -= crag.model.name
-        deleted(rev).right
-      }
-    } else {
-      NotFound().left
-    }
-  }
-
-  private def TODO: Nothing = throw new UnsupportedOperationException("Not implemented")
-
-  def reset() {
-    revision = 0L
-    crags = Map()
-    deletedCrags = Map()
-  }
+  override def delete(crag: Revisioned[Crag]) = db.deleteCrag(crag)
 
 }
 
 class CragDaoMockTest extends CragDaoSpec {
 
-  override protected val cragDao = new CragDaoMock()
-  override protected val climbDao = null
+  private var db = new FakeDb()
+  private var _cragDao = new CragDaoMock(db)
+  private var _climbDao = new FakeClimbDao(db)
+
+  override protected def cragDao = _cragDao
+  override protected def climbDao = _climbDao
   override protected val runner = new ActionRunner {
     def run[M[+_],A,I <: IsolationLevel, W <: List[ActionEvent]](action: ActionT[M,A,I,W])
                                                                 (implicit F: Failable[M[_]], M: Functor[M], m: Manifest[I]): M[A] = {
@@ -129,7 +49,9 @@ class CragDaoMockTest extends CragDaoSpec {
   }
 
   override def cleanDao() {
-    cragDao.reset()
+    db = new FakeDb()
+    _cragDao = new CragDaoMock(db)
+    _climbDao = new FakeClimbDao(db)
   }
 
 }

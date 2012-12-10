@@ -16,8 +16,8 @@ trait CrudApi {
   /**
    * Abstract members.
    */
-  val climbDao: ClimbDao
-  val cragDao: CragDao
+  def climbDao: ClimbDao
+  def cragDao: CragDao
 
   /**
    * Climb related actions.  These just pass straight through to the DAO
