@@ -583,7 +583,7 @@ trait CragDaoSpec extends FunSpec
 
 class CragDaoTest extends CragDaoSpec {
 
-  override protected val runner = new DefaultActionRunner(TestDatabaseSessions.source)
+  override val runner = new DefaultActionRunner(TestDatabaseSessions.source)
 
   private def cleanDao() {
     implicit val connection = TestDatabaseSessions.newConnection(new TransactionRepeatableRead())
