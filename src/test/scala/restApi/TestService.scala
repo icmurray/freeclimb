@@ -1,5 +1,8 @@
 package freeclimb.restApi
 
+import scalaz._
+import Scalaz._
+
 import org.scalatest.{FunSpec, BeforeAndAfter}
 import org.scalatest.matchers.ShouldMatchers
 
@@ -31,7 +34,12 @@ class ServiceTest extends FunSpec
 
   before {
     api.reset()
-    runner.run { api.createCrag(burbage) }
+    runner.run {
+      for {
+        _ <- api.createCrag(burbage)
+        _ <- api.createClimb(longTallSally)
+      } yield ()
+    }
   }
 
   describe("The Service") {
@@ -87,7 +95,7 @@ class ServiceTest extends FunSpec
           Get("/crags/burbage") ~> routes ~> check {
             val etag = header("ETag")
             etag should not equal (None)
-            etag.get.value.toLong should equal (1L)
+            etag.get.value.toLong should equal (2L)
           }
         }
 
@@ -96,7 +104,7 @@ class ServiceTest extends FunSpec
             val json = entityAs[JsObject]
             val revision = json.fields.get("revision")
             revision should not equal (None)
-            revision.get.asInstanceOf[JsNumber].value should equal (1L)
+            revision.get.asInstanceOf[JsNumber].value should equal (2L)
           }
         }
 
@@ -115,12 +123,12 @@ class ServiceTest extends FunSpec
         }
 
         it("Should 304 (Not Modified) if given a matching ETag in If-None-Match") {
-          Get("/crags/burbage") ~> addHeader("If-None-Match", "1") ~> routes ~> check {
+          Get("/crags/burbage") ~> addHeader("If-None-Match", "2") ~> routes ~> check {
             status should equal (NotModified)
 
             val etag = header("ETag")
             etag should not equal (None)
-            etag.get.value.toLong should equal (1L)
+            etag.get.value.toLong should equal (2L)
           }
         }
 
@@ -130,7 +138,7 @@ class ServiceTest extends FunSpec
 
             val etag = header("ETag")
             etag should not equal (None)
-            etag.get.value.toLong should equal (1L)
+            etag.get.value.toLong should equal (2L)
           }
         }
       }
@@ -212,7 +220,7 @@ class ServiceTest extends FunSpec
           it("Should update an existing Crag if revision is current") {
             val jsonContent = """{"title": "Burbage Edge Title Updated"}""".asJson.asJsObject
             Put("/crags/burbage", jsonContent) ~>
-              addHeader("If-Match", "1") ~> 
+              addHeader("If-Match", "2") ~> 
               routes ~> check {
               status should equal (OK)
             }
@@ -256,30 +264,30 @@ class ServiceTest extends FunSpec
         }
 
         it("Should 200 if the climb exists") {
-          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+          Get("/climbs/burbage/long-tall-sally") ~> routes ~> check {
             status should equal (OK)
           }
         }
 
         it("Should contain the revision in the ETag header") {
-          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+          Get("/climbs/burbage/long-tall-sally") ~> routes ~> check {
             val etag = header("ETag")
             etag should not equal (None)
-            etag.get.value.toLong should equal (1L)
+            etag.get.value.toLong should equal (2L)
           }
         }
 
         it("Should contain the revision in the representation") {
-          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+          Get("/climbs/burbage/long-tall-sally") ~> routes ~> check {
             val json = entityAs[JsObject]
             val revision = json.fields.get("revision")
             revision should not equal (None)
-            revision.get.asInstanceOf[JsNumber].value should equal (1L)
+            revision.get.asInstanceOf[JsNumber].value should equal (2L)
           }
         }
 
         it("Should describe the requested climb as JSON") {
-          Get("/crags/burbage/long-tall-sally") ~> routes ~> check {
+          Get("/climbs/burbage/long-tall-sally") ~> routes ~> check {
             val json = entityAs[JsObject]
 
             val name = json.fields.get("name")
@@ -293,26 +301,26 @@ class ServiceTest extends FunSpec
         }
 
         it("Should 304 (Not Modified) if given a matching ETag in If-None-Match") {
-          Get("/crags/burbage/long-tall-sally") ~>
-              addHeader("If-None-Match", "1") ~>
+          Get("/climbs/burbage/long-tall-sally") ~>
+              addHeader("If-None-Match", "2") ~>
               routes ~> check {
             status should equal (NotModified)
 
             val etag = header("ETag")
             etag should not equal (None)
-            etag.get.value.toLong should equal (1L)
+            etag.get.value.toLong should equal (2L)
           }
         }
 
         it("Should 200 if ETag does not match") {
-          Get("/crags/burbage/long-tall-sally") ~>
+          Get("/climbs/burbage/long-tall-sally") ~>
               addHeader("If-None-Match", "0") ~>
               routes ~> check {
             status should equal (OK)
 
             val etag = header("ETag")
             etag should not equal (None)
-            etag.get.value.toLong should equal (1L)
+            etag.get.value.toLong should equal (2L)
           }
         }
       }
