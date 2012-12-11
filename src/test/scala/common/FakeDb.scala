@@ -15,7 +15,8 @@ class FakeDb {
   private var deletedCrags: Map[String, List[Revisioned[Crag]]] = Map()
 
   private var climbs: Map[(String, String), Revisioned[Climb]] = Map()
-  private var climbHistory: Map[String, List[Revisioned[Climb]]] = Map()
+  private var climbHistory: Map[(String, String), List[Revisioned[Climb]]] = Map()
+  private var deletedClimbs: Map[(String, String), List[Revisioned[Climb]]] = Map()
   
   def createCrag(crag: Crag) = ApiUpdateAction { session =>
     if (crags contains crag.name) {
@@ -37,7 +38,13 @@ class FakeDb {
     } else {
       val rev = newRevision(climb)
       climbs += (climb.crag.name, climb.name) -> rev
-      climbHistory += climb.name -> List(rev)
+      climbHistory += (climb.crag.name, climb.name) -> List(rev)
+
+      // Bump the Crag's revision number
+      val newCragRevision = Revisioned(rev.revision, climb.crag)
+      crags += climb.crag.name -> newCragRevision
+      cragHistory += climb.crag.name -> (newCragRevision :: cragHistory(climb.crag.name).tail)
+
       created(rev).right
     }
   }
@@ -54,13 +61,29 @@ class FakeDb {
     crags.values.toList map { _.model } right
   }
 
-  def deletedList = ApiReadAction { session =>
+  def deletedCragList = ApiReadAction { session =>
     deletedCrags.values.toList.flatten.right
+  }
+
+  def deletedClimbList = ApiReadAction { session =>
+    deletedClimbs.values.toList.flatten map { rev: Revisioned[Climb] =>
+      Revisioned(rev.revision, Climb.makeUnsafe(
+        rev.model.name,
+        rev.model.title,
+        rev.model.description,
+        crags.get(rev.model.crag.name) map { _.model } getOrElse rev.model.crag,
+        rev.model.grade))
+    } right
   }
 
   def history(crag: Crag) = ApiReadAction { session =>
     val name = crag.name
     (cragHistory.get(name) getOrElse List()).right
+  }
+
+  def history(climb: Climb) = ApiReadAction { session =>
+    val climbId = (climb.crag.name, climb.name)
+    (climbHistory.get(climbId) getOrElse List()).right
   }
 
   def deleteCrag(rev: Revisioned[Crag]) = ApiUpdateAction { session =>
@@ -76,6 +99,28 @@ class FakeDb {
       crags -= name
       cragHistory -= name
       deletedCrags = Map(name -> List(rev)) |+| deletedCrags
+      deleted(rev).right
+    }
+  }
+
+  def deleteClimb(rev: Revisioned[Climb]) = ApiUpdateAction { session =>
+    val climb = rev.model
+    val climbId = (climb.crag.name, climb.name)
+    if(! climbs.contains(climbId) ) {
+      NotFound().left
+    } else if (climbs(climbId).revision != rev.revision) {
+      EditConflict().left
+    } else {
+      climbs -= climbId
+      climbHistory -= climbId
+      this.revision += 1
+      deletedClimbs = Map(climbId -> List(Revisioned(this.revision, rev.model))) |+| deletedClimbs
+      
+      // Bump the Crag's revision number
+      val newCragRevision = Revisioned(this.revision, climb.crag)
+      crags += climb.crag.name -> newCragRevision
+      cragHistory += climb.crag.name -> (newCragRevision :: cragHistory(climb.crag.name).tail)
+
       deleted(rev).right
     }
   }
@@ -111,7 +156,14 @@ class FakeDb {
       EditConflict().left
     } else {
       val newRev = newRevision(climb)
+      
       climbs += climbId -> newRev
+      climbHistory += climbId -> (newRev :: climbHistory(climbId))
+
+      // Bump the Crag's revision number
+      val newCragRevision = Revisioned(newRev.revision, climb.crag)
+      crags += climb.crag.name -> newCragRevision
+      cragHistory += climb.crag.name -> (newCragRevision :: cragHistory(climb.crag.name).tail)
 
       created(newRev).right
     }
@@ -132,6 +184,29 @@ class FakeDb {
       deletedCrags -= name
       purged(rev).right
     }
+  }
+
+  def purgeClimb(rev: Revisioned[Climb]) = ApiUpdateAction { session =>
+    val climb = rev.model
+    val climbId = (climb.crag.name, climb.name)
+    if(! climbs.contains(climbId) ) {
+      NotFound().left
+    } else if (climbs(climbId).revision != rev.revision) {
+      EditConflict().left
+    } else {
+      climbs -= climbId
+      climbHistory -= climbId
+      deletedClimbs -= climbId
+      purged(rev).right
+    }
+  }
+
+  def climbsCreatedOrUpdatedSince(crag: Revisioned[Crag]) = ApiReadAction { session =>
+    climbs.values.toList filter { _.model.crag.name == crag.model.name } filter { _.revision > crag.revision } right
+  }
+
+  def climbsDeletedSince(crag: Revisioned[Crag]) = ApiReadAction { session =>
+    deletedClimbs.values.toList map { _.head } filter { _.model.crag.name == crag.model.name } filter { _.revision > crag.revision } right
   }
 
   /**

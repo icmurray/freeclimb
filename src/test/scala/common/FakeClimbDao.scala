@@ -15,15 +15,23 @@ class FakeClimbDao(db: FakeDb) extends ClimbDao {
 
   override def getOption(crag: String, name: String) = db.getOption(crag, name)
 
-  override def update(rev: Revisioned[Climb]) = TODO
+  override def update(rev: Revisioned[Climb]) = db.updateClimb(rev)
 
-  override def history(climb: Climb) = TODO
+  override def history(climb: Climb) = db.history(climb)
 
-  override def deletedList() = TODO
+  override def deletedList() = db.deletedClimbList
 
-  override def purge(climb: Revisioned[Climb]) = TODO
+  override def purge(climb: Revisioned[Climb]) = db.purgeClimb(climb)
 
-  override def delete(climb: Revisioned[Climb]) = TODO
+  override def delete(climb: Revisioned[Climb]) = db.deleteClimb(climb)
+
+  override def climbsCreatedOrUpdatedSince(crag: Revisioned[Crag]) = {
+    db.climbsCreatedOrUpdatedSince(crag)
+  }
+
+  override def climbsDeletedSince(crag: Revisioned[Crag]) = {
+    db.climbsDeletedSince(crag)
+  }
 
   private def TODO: Nothing = throw new UnsupportedOperationException("Not implemented")
 }

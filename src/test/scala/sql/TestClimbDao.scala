@@ -81,7 +81,7 @@ trait ClimbDaoSpec extends FunSpec
           run {
             for {
               _ <- cragDao.create(burbage)
-              _ <- ClimbDao.create(harvest)
+              _ <- climbDao.create(harvest)
             } yield ()
           } getOrElse fail("Failed to create fixture climb")
 
@@ -140,7 +140,7 @@ trait ClimbDaoSpec extends FunSpec
           run {
             for {
               _ <- cragDao.create(burbage)
-              _ <- ClimbDao.create(harvest)
+              _ <- climbDao.create(harvest)
             } yield ()
           } getOrElse fail("Failed to create fixture climb")
 
@@ -270,15 +270,18 @@ trait ClimbDaoSpec extends FunSpec
 
       it("should bump the Crag's revision number when updating the Climb") {
         withDaos { (cragDao, climbDao) =>
-          val (first, second) = run {
+          val (first, second, third) = run {
             for {
               first  <- cragDao.create(burbage)
-              _      <- climbDao.create(harvest)
+              rev    <- climbDao.create(harvest)
               second <- cragDao.get("burbage")
-            } yield (first, second)
+              _      <- climbDao.update(Revisioned[Climb](rev.revision, newHarvest))
+              third  <- cragDao.get("burbage")
+            } yield (first, second, third)
           } getOrElse fail("Failed to create crag fixture")
 
           first.revision should be < (second.revision)
+          second.revision should be < (third.revision)
         }
       }
     }

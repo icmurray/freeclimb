@@ -21,7 +21,7 @@ class CragDaoMock(db: FakeDb) extends CragDao {
 
   override def history(crag: Crag) = db.history(crag)
 
-  override def deletedList() = db.deletedList
+  override def deletedList() = db.deletedCragList
 
   override def purge(crag: Revisioned[Crag]) = db.purgeCrag(crag)
 
