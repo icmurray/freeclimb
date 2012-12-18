@@ -53,9 +53,25 @@ object UkTrad {
     val techGrade = Grade.UkTechnical(difficulty % MAX_TECH_GRADE)
     new UkTrad(adjGrade, techGrade)
   }
+
+  def apply(difficulty: String): UkTrad = {
+    difficulty.split(" ").toList match {
+      case List(adjS, techS) =>
+        new UkTrad(Grade.UkAdjective.withName(adjS),
+                   Grade.UkTechnical.withName(techS))
+      case _                 => throw new RuntimeException("Uh oh")
+
+    }
+  }
+
 }
 
 object Grade {
+
+  def apply(system: String, difficulty: String): Grade = {
+    val systemE = GradingSystem.withName(system)
+    Grade(systemE, difficulty)
+  }
 
   def apply(system: String, difficulty: Int): Grade = {
     Grade(GradingSystem.withName(system), difficulty)
@@ -66,6 +82,13 @@ object Grade {
     case GradingSystem.UkTechnical => new UkTechnical(Grade.UkTechnical(difficulty))
     case GradingSystem.UkAdjective => new UkAdjective(Grade.UkAdjective(difficulty))
     case GradingSystem.UkTrad => UkTrad(difficulty)
+  }
+
+  def apply(system: GradingSystem.GradingSystem, difficulty: String): Grade = system match {
+    case GradingSystem.EuSport     => new EuSport(Grade.EuSport.withName(difficulty))
+    case GradingSystem.UkTechnical => new UkTechnical(Grade.UkTechnical.withName(difficulty))
+    case GradingSystem.UkAdjective => new UkAdjective(Grade.UkAdjective.withName(difficulty))
+    case GradingSystem.UkTrad      => UkTrad(difficulty)
   }
 
   /**
