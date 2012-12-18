@@ -41,6 +41,34 @@ trait ResourceJson {
         RevisionedCragResource(title.value, revision.value.longValue).right
       }
     }
+  }
+
+  implicit object ClimbResourceJsonReader
+      extends RootJsonReader[Disj[ClimbResource]] {
+
+    def read(value: JsValue) = {
+      implicit val m = value.asJsObject.fields
+
+      ( extract[JsString]("title")       |@|
+        extract[JsString]("description")
+      ).tupled.disjunction >>= { case (title, description) =>
+        ClimbResource(title.value,
+                      description.value,
+                      UkTrad(Grade.UkAdjective.E2, Grade.UkTechnical.T5c)).right
+      }
+    }
+  }
+
+  implicit object GradeJsonReader
+      extends RootJsonReader[Disj[Grade]] {
+
+    def read(value: JsValue) = {
+      implicit val m = value.asJsObject.fields
+
+      ( extract[JsString]("system")     |@|
+        extract[JsString]("difficulty")
+      ) { case (system, difficulty) => Grade(system.value, difficulty.value) }.disjunction
+    }
 
   }
 

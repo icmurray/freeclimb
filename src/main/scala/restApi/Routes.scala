@@ -49,6 +49,35 @@ trait Routes extends HttpService {
             }
           } getOrElse complete(HttpResponse(StatusCodes.NotFound))
         }
+      } ~
+      put {
+        entity(as[Disj[ClimbResource]]) { climbResource =>
+          run(api.getCragOption(cragName)) { success =>
+            success map { crag =>
+              resourceToClimb(climbResource, climbName, crag.model).fold(
+                errors => complete(StatusCodes.BadRequest, errors),
+
+                climb  => {
+                  headerValue(resourceCreation) { _ =>
+                    runner.run { api.createClimb(climb) }.fold(
+                      failure  => complete(handleActionFailure(failure)),
+                      revision => complete(StatusCodes.Created, revision)
+                    )
+                  } ~
+                  headerValue(resourceUpdate) { revision =>
+                    val currentRevision = Revisioned[Climb](revision, climb)
+                    runner.run { api.updateClimb(currentRevision) }.fold(
+                      failure     => complete(handleActionFailure(failure)),
+                      newRevision => complete(newRevision)
+                    )
+                  } ~ complete(StatusCodes.PreconditionRequired, """
+                        Make request with 'If-None-Match: *' header to create a new Climb
+                        Make request with 'If-Match: <rev>' header to update an existing Climb""")
+                }
+              )
+            } getOrElse complete(HttpResponse(StatusCodes.NotFound))
+          }
+        }
       }
     } ~
     path("crags") {
@@ -122,6 +151,16 @@ trait Routes extends HttpService {
   private def resourceToCrag(resourceDisjunction: Disj[CragResource], cragName: String) = {
     resourceDisjunction >>= { resource: CragResource =>
       Crag(cragName, resource.title)
+    }
+  }
+
+  private def resourceToClimb(resourceDisjunction: Disj[ClimbResource], climbName: String, crag: Crag) = {
+    resourceDisjunction >>= { resource: ClimbResource =>
+      Climb(climbName,
+            resource.title,
+            resource.description,
+            crag,
+            resource.grade)
     }
   }
 

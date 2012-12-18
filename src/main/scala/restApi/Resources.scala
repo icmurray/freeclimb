@@ -1,5 +1,7 @@
 package freeclimb.restApi
 
+import freeclimb.models.Grade
+
 /**
  * Although this may look like a duplication of code, I think it will be
  * quite useful to have a separation of rest resources from domain models.
@@ -18,3 +20,8 @@ case class CragResource(title: String)
 case class RevisionedCragResource(
     title: String,
     revision: Long)
+
+case class ClimbResource(
+    title: String,
+    description: String,
+    grade: Grade)
