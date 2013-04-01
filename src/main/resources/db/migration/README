@@ -1,8 +1,0 @@
-Format for migration naming:
-
-V{freeclimb verion}_{migration step}__{description}
-
-Eg: "V0.1_1__First-migration-step" is the first migration step of version 0.1
-of freeclimb, cf.  "V0.2_1__First-migration-step-of-freeclimb-0.2".
-
-
