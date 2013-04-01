@@ -1,5 +1,10 @@
 package freeclimb.models
 
+import scalaz._
+import Scalaz._
+
+import freeclimb.validation._
+
 /**
  * Grade trait.
  *
@@ -22,16 +27,28 @@ case class EuSport (val grade: Grade.EuSport.EuSport) extends Grade {
   override val difficulty = grade.id
 }
 
+object EuSport extends FromDifficultyString {
+  val enum = Grade.EuSport
+}
+
 case class UkTechnical (val grade: Grade.UkTechnical.UkTechnical) extends Grade {
   override val toString = grade.toString
   override val system = Grade.GradingSystem.UkTechnical
   override val difficulty = grade.id
 }
 
+object UkTechnical extends FromDifficultyString {
+  val enum = Grade.UkTechnical
+}
+
 case class UkAdjective (val grade: Grade.UkAdjective.UkAdjective) extends Grade {
   override val toString = grade.toString
   override val system = Grade.GradingSystem.UkAdjective
   override val difficulty = grade.id
+}
+
+object UkAdjective extends FromDifficultyString {
+  val enum = Grade.UkAdjective
 }
 
 case class UkTrad (
@@ -54,28 +71,43 @@ object UkTrad {
     new UkTrad(adjGrade, techGrade)
   }
 
-  def apply(difficulty: String): UkTrad = {
+  def apply(difficulty: String): \/[String,UkTrad] = {
     difficulty.split(" ").toList match {
       case List(adjS, techS) =>
-        new UkTrad(Grade.UkAdjective.withName(adjS),
-                   Grade.UkTechnical.withName(techS))
-      case _                 => throw new RuntimeException("Uh oh")
+        (UkAdjective(adjS).validation  |@|
+         UkTechnical(techS).validation
+        ) { case (adj, tech) => UkTrad(adj,tech): UkTrad }.disjunction
+      case _                 => ("Unknown UkTrad grade: " + difficulty).left
 
     }
   }
 
 }
 
+trait FromDifficultyString {
+  val enum: Grade.GradeEnumeration
+
+  def apply(difficulty: String): \/[String,Grade] = {
+    enum.values.find { _.toString == difficulty }.
+                toSuccess("Unknown " + enum.toString + " grade: " + difficulty).
+                disjunction
+  }
+}
+
 object Grade {
 
-  def apply(system: String, difficulty: String): Grade = {
-    val systemE = GradingSystem.withName(system)
-    Grade(systemE, difficulty)
+  trait GradeEnumeration extends Enumeration
+
+  def apply(system: String, difficulty: String): Disj[Grade] = {
+    GradingSystem.values.find { _.toString == system }.
+                         toSuccess("Unknown grading system: " + system).
+                         enrichAs("system").
+                         disjunction >>= { Grade(_, difficulty) }
   }
 
-  def apply(system: String, difficulty: Int): Grade = {
-    Grade(GradingSystem.withName(system), difficulty)
-  }
+  //def apply(system: String, difficulty: Int): Disj[Grade] = {
+  //  Grade(GradingSystem.withName(system), difficulty)
+  //}
 
   def apply(system: GradingSystem.GradingSystem, difficulty: Int): Grade = system match {
     case GradingSystem.EuSport => new EuSport(Grade.EuSport(difficulty))
@@ -84,11 +116,11 @@ object Grade {
     case GradingSystem.UkTrad => UkTrad(difficulty)
   }
 
-  def apply(system: GradingSystem.GradingSystem, difficulty: String): Grade = system match {
-    case GradingSystem.EuSport     => new EuSport(Grade.EuSport.withName(difficulty))
-    case GradingSystem.UkTechnical => new UkTechnical(Grade.UkTechnical.withName(difficulty))
-    case GradingSystem.UkAdjective => new UkAdjective(Grade.UkAdjective.withName(difficulty))
-    case GradingSystem.UkTrad      => UkTrad(difficulty)
+  def apply(system: GradingSystem.GradingSystem, difficulty: String): Disj[Grade] = system match {
+    case GradingSystem.EuSport     => EuSport(difficulty)
+    case GradingSystem.UkTechnical => UkTechnical(difficulty)
+    case GradingSystem.UkAdjective => UkAdjective(difficulty)
+    case GradingSystem.UkTrad      => UkTrad(difficulty).validation.enrichAs("grade").disjunction
   }
 
   /**
@@ -106,7 +138,7 @@ object Grade {
     val Font = Value("Font")
   }
 
-  object EuSport extends Enumeration {
+  object EuSport extends GradeEnumeration {
     type EuSport = Value
     val Eu1   = Value(1,  "F1")
     val Eu2   = Value(2,  "F2")
@@ -143,7 +175,7 @@ object Grade {
     val Eu9cP = Value(33, "F9c+")
   }
 
-  object UkTechnical extends Enumeration {
+  object UkTechnical extends GradeEnumeration {
     type UkTechnical = Value
     val T1a = Value(1,  "1")
     val T2a = Value(2,  "2")
@@ -166,7 +198,7 @@ object Grade {
 
     val MAX_DIFFICULTY = 18
   }
-  object UkAdjective extends Enumeration {
+  object UkAdjective extends GradeEnumeration {
     type UkAdjective = Value
     val Easy = Value(1,  "Easy")
     val Mod  = Value(2,  "Mod")
