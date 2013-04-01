@@ -5,3 +5,5 @@ target/
 # Dev database.
 *.pg
 solr-server
+
+scalatags
