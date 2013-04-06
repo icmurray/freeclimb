@@ -14,8 +14,9 @@ trait ClimbRoutes extends ApiRoutes {
         parameters('limit.as[Long] ? 100L,
                    'offset.as[Long] ? 0L).as(PaginationRequest) { paging =>
           complete {
-            val (climbs,count) = climbRepo.getPage(paging.limit, paging.offset)
-            PagedResponse(paging, count, climbs)
+            for {
+              (climbs,count) <- climbRepo.getPage(paging.limit, paging.offset)
+            } yield PagedResponse(paging, count, climbs)
           }
         }
       }

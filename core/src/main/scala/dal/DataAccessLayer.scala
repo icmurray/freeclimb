@@ -4,8 +4,6 @@ trait DataAccessLayer extends ClimbRepositoryComponent
 
 trait DefaultDataAccessLayer extends DataAccessLayer {
 
-  override lazy val climbRepo = new ClimbRepository {
-    def getPage(limit: Long, offset: Long) = { sys.error("Not implemented") }
-  }
+  override lazy val climbRepo = new DefaultClimbRepository()
 
 }
