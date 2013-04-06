@@ -1,17 +1,16 @@
 package org.freeclimbers.api.routes
 
-import spray.http._
-import spray.http.HttpHeaders._
-import spray.routing.HttpService
+import org.freeclimbers.api.PaginationRequest
 
-trait ClimbRoutes extends HttpService {
-
-  private val TODO = complete(HttpResponse(StatusCodes.NotImplemented))
+trait ClimbRoutes extends ApiRoutes {
 
   val climbRoutes = {
     path("climbs") {
       get {
-        TODO
+        parameters('limit.as[Long] ? 100L,
+                   'offset.as[Long] ? 0L).as(PaginationRequest) { paging =>
+          TODO
+        }
       }
     }
   }
