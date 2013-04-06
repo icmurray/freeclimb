@@ -2,7 +2,7 @@ package org.freeclimbers.api.routes
 
 import org.freeclimbers.core.controllers.ClimbController
 
-import org.freeclimbers.api.PaginationRequest
+import org.freeclimbers.api.{PaginationRequest, PagedResponse}
 
 trait ClimbRoutes extends ApiRoutes {
 
@@ -13,8 +13,10 @@ trait ClimbRoutes extends ApiRoutes {
       get {
         parameters('limit.as[Long] ? 100L,
                    'offset.as[Long] ? 0L).as(PaginationRequest) { paging =>
-          val (climbs,count) = climbController.getPage(paging.limit, paging.offset)
-          TODO
+          complete {
+            val (climbs,count) = climbController.getPage(paging.limit, paging.offset)
+            PagedResponse(paging, count, climbs)
+          }
         }
       }
     }

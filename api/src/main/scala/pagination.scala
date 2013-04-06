@@ -13,3 +13,13 @@ case class PagedResponse[T](
     offset: Long,
     count: Long,
     payload: Seq[T])
+
+object PagedResponse {
+  def apply[T](paging: PaginationRequest, count: Long, payload: Seq[T]): PagedResponse[T] = {
+    PagedResponse(
+      limit = paging.limit,
+      offset = paging.offset,
+      count = count,
+      payload = payload)
+  }
+}

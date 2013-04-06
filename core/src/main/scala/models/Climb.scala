@@ -1,3 +1,4 @@
 package org.freeclimbers.core.models
 
-case class Climb()
+case class Climb(
+    name: String)

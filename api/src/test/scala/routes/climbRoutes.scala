@@ -10,8 +10,8 @@ import org.scalatest.GivenWhenThen
 import org.scalamock.scalatest.MockFactory
 
 import org.freeclimbers.core.controllers.ClimbController
-
-import org.freeclimbers.api.PaginationRequest
+import org.freeclimbers.core.models.Climb
+import org.freeclimbers.api.{PaginationRequest, PagedResponse}
 
 class ClimbRoutesApiSpec extends FeatureSpec
                          with GivenWhenThen
@@ -31,6 +31,7 @@ class ClimbRoutesApiSpec extends FeatureSpec
         def actorRefFactory = system
         def climbController = controller
       }
+      import routes._
 
       Get("/climbs?limit=10") ~> routes.climbRoutes ~> check {
         When("/climbs?limit=10 is accessed")
@@ -38,6 +39,9 @@ class ClimbRoutesApiSpec extends FeatureSpec
         assert(status === OK)
         
         And("it should contain all 10 climbs")
+        val result = entityAs[PagedResponse[Climb]]
+        assert(result.count === 10)
+        assert(result.payload.toSet === List().toSet)
       }
 
     }
