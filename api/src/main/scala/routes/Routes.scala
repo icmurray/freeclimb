@@ -1,8 +1,8 @@
 package org.freeclimbers.api.routes
 
-import org.freeclimbers.core.dal.DataAccessLayer
+import org.freeclimbers.api.controllers.Controllers
 
-trait Routes extends ClimbRoutes { this: DataAccessLayer =>
+trait Routes extends ClimbRoutes { this: Controllers =>
 
   val routes = climbRoutes
 
