@@ -30,7 +30,11 @@ object Freeclimbers extends Build {
                             libraryDependencies ++= Seq(
                               "com.typesafe.akka"         %% "akka-actor"                    % "2.1.2",
                               "io.spray"                   % "spray-can"                     % "1.1-M7",
-                              "io.spray"                   % "spray-routing"                 % "1.1-M7"
+                              "io.spray"                   % "spray-routing"                 % "1.1-M7",
+                              "org.scalatest"             %% "scalatest"                     % "1.9.1"        % "test",
+                              "org.scalamock"             %% "scalamock-scalatest-support"   % "3.0.1"        % "test",
+                              "io.spray"                   % "spray-testkit"                 % "1.1-M7"       % "test"
+
                             )
                           )
                   ) dependsOn(core)
