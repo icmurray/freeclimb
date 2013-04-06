@@ -24,39 +24,64 @@ class ClimbRoutesApiSpec extends FeatureSpec
     info("I want to list all available climbs")
 
     scenario("all the climbs fit on one page") {
-      Given("10 climbs in the database")
+      Given("4 climbs in the database")
       val controller = mock[ClimbController]
-      (controller.getPage _).expects(10, 0).returning(List(),0)
+      (controller.getPage _).expects(4, 0).returning(initClimbs,4)
       val routes = new ClimbRoutes {
         def actorRefFactory = system
         def climbController = controller
       }
       import routes._
 
-      Get("/climbs?limit=10") ~> routes.climbRoutes ~> check {
-        When("/climbs?limit=10 is accessed")
+      Get("/climbs?limit=4") ~> routes.climbRoutes ~> check {
+        When("/climbs?limit=4 is accessed")
         Then("the response should be successful")
         assert(status === OK)
         
-        And("it should contain all 10 climbs")
+        And("it should contain all 4 climbs")
         val result = entityAs[PagedResponse[Climb]]
-        assert(result.count === 10)
-        assert(result.payload.toSet === List().toSet)
+        assert(result.count === 4)
+        assert(result.payload.toSet === initClimbs.toSet)
       }
 
     }
 
     scenario("climbs are split across 2 pages") {
-      Given("10 climbs in the database")
-      When("/climbs?limit=5 is accessed")
-      Then("the response should be successful")
-      And("it should contain the first 5 climbs")
-      When("/climbs?limit=5&offset=5 is accessed")
-      Then("the response should be successful")
-      And("it should contain the remaining climbs")
-      pending
+      Given("4 climbs in the database")
+      val controller = mock[ClimbController]
+      (controller.getPage _).expects(2, 0).returning(initClimbs.slice(0,2),4)
+      (controller.getPage _).expects(2, 2).returning(initClimbs.slice(2,4),4)
+      val routes = new ClimbRoutes {
+        def actorRefFactory = system
+        def climbController = controller
+      }
+      import routes._
+
+      Get("/climbs?limit=2") ~> routes.climbRoutes ~> check {
+        When("/climbs?limit=2 is accessed")
+        Then("the response should be successful")
+        assert(status === OK)
+
+        And("it should contain the first 2 climbs")
+        val result = entityAs[PagedResponse[Climb]]
+        assert(result.count === 4)
+        assert(result.payload.toSet === initClimbs.slice(0,2).toSet)
+      }
+
+      Get("/climbs?limit=2&offset=2") ~> routes.climbRoutes ~> check {
+        When("/climbs?limit=2&offset=2 is accessed")
+        Then("the response should be successful")
+        assert(status === OK)
+
+        And("it should contain the remaining climbs")
+        val result = entityAs[PagedResponse[Climb]]
+        assert(result.count === 4)
+        assert(result.payload.toSet === initClimbs.slice(2,4).toSet)
+      }
     }
 
   }
+
+  private val initClimbs = ('a' to 'd').map(s => Climb(s"Climb ${s}"))
 
 }
