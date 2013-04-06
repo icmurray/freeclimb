@@ -9,7 +9,7 @@ import org.scalatest.GivenWhenThen
 
 import org.scalamock.scalatest.MockFactory
 
-import org.freeclimbers.core.controllers.ClimbController
+import org.freeclimbers.core.dal.ClimbRepository
 import org.freeclimbers.core.models.Climb
 import org.freeclimbers.api.{PaginationRequest, PagedResponse}
 
@@ -25,11 +25,11 @@ class ClimbRoutesApiSpec extends FeatureSpec
 
     scenario("all the climbs fit on one page") {
       Given("4 climbs in the database")
-      val controller = mock[ClimbController]
-      (controller.getPage _).expects(4, 0).returning(initClimbs,4)
+      val repo = mock[ClimbRepository]
+      (repo.getPage _).expects(4, 0).returning(initClimbs,4)
       val routes = new ClimbRoutes {
-        def actorRefFactory = system
-        def climbController = controller
+        override def actorRefFactory = system
+        override def climbRepo = repo
       }
       import routes._
 
@@ -48,12 +48,12 @@ class ClimbRoutesApiSpec extends FeatureSpec
 
     scenario("climbs are split across 2 pages") {
       Given("4 climbs in the database")
-      val controller = mock[ClimbController]
-      (controller.getPage _).expects(2, 0).returning(initClimbs.slice(0,2),4)
-      (controller.getPage _).expects(2, 2).returning(initClimbs.slice(2,4),4)
+      val Repo = mock[ClimbRepository]
+      (Repo.getPage _).expects(2, 0).returning(initClimbs.slice(0,2),4)
+      (Repo.getPage _).expects(2, 2).returning(initClimbs.slice(2,4),4)
       val routes = new ClimbRoutes {
-        def actorRefFactory = system
-        def climbController = controller
+        override def actorRefFactory = system
+        override def climbRepo = Repo
       }
       import routes._
 
