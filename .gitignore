@@ -1,6 +1,7 @@
 target/
 
 *.swp
+*.swo
 
 # Dev database.
 *.pg
