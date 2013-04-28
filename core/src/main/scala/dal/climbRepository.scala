@@ -1,6 +1,6 @@
 package org.freeclimbers.core.dal
 
-import scala.concurrent.Future
+import scala.concurrent._
 
 import org.freeclimbers.core.models.Climb
 
@@ -19,7 +19,10 @@ trait ClimbRepository {
 class DefaultClimbRepository extends ClimbRepository {
 
   override def getPage(limit: Long, offset: Long) = {
-    sys.error("Not implemented")
+    import ExecutionContext.Implicits.global
+    future {
+      (List(Climb("climb-1"), Climb("climb-2")), 2)
+    }
   }
 
 }

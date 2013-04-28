@@ -12,7 +12,7 @@ import org.scalatest.GivenWhenThen
 import org.scalamock.scalatest.MockFactory
 
 import org.freeclimbers.core.models.Climb
-import org.freeclimbers.api.{PaginationRequest, PagedResponse}
+import org.freeclimbers.api.{PageLimits, Page}
 import org.freeclimbers.api.controllers.{ClimbController, ClimbControllerComponent}
 
 class ClimbRoutesApiSpec extends FeatureSpec
@@ -28,11 +28,12 @@ class ClimbRoutesApiSpec extends FeatureSpec
     scenario("all the climbs fit on one page") {
       Given("4 climbs in the database")
       val controller = mock[ClimbController]
-      (controller.getPage _).expects(PaginationRequest(4,0))
+      (controller.getPage _).expects(PageLimits(4,0),*)
                             .returning(future {
-                              PagedResponse[Climb](
+                              Page(
                                 count = initClimbs.length,
-                                payload = initClimbs)
+                                payload = initClimbs,
+                                links = Map())
                             })
       val routes = new ClimbRoutes with ClimbControllerComponent {
         override def actorRefFactory = system
@@ -46,7 +47,7 @@ class ClimbRoutesApiSpec extends FeatureSpec
         assert(status === OK)
         
         And("it should contain all 4 climbs")
-        val result = entityAs[PagedResponse[Climb]]
+        val result = entityAs[Page[Climb]]
         assert(result.count === 4)
         assert(result.payload.toSet === initClimbs.toSet)
       }
@@ -56,17 +57,19 @@ class ClimbRoutesApiSpec extends FeatureSpec
     scenario("climbs are split across 2 pages") {
       Given("4 climbs in the database")
       val controller = mock[ClimbController]
-      (controller.getPage _).expects(PaginationRequest(2,0))
+      (controller.getPage _).expects(PageLimits(2,0), *)
                             .returning(future { 
-                              PagedResponse[Climb](
+                              Page(
                                 count = initClimbs.length,
-                                payload = initClimbs.slice(0,2))
+                                payload = initClimbs.slice(0,2),
+                                links = Map())
                             })
-      (controller.getPage _).expects(PaginationRequest(2,2))
+      (controller.getPage _).expects(PageLimits(2,2), *)
                             .returning(future {
-                              PagedResponse[Climb](
+                              Page(
                                 count = initClimbs.length,
-                                payload = initClimbs.slice(2,4))
+                                payload = initClimbs.slice(2,4),
+                                links = Map())
                             })
       val routes = new ClimbRoutes with ClimbControllerComponent {
         override def actorRefFactory = system
@@ -80,7 +83,7 @@ class ClimbRoutesApiSpec extends FeatureSpec
         assert(status === OK)
 
         And("it should contain the first 2 climbs")
-        val result = entityAs[PagedResponse[Climb]]
+        val result = entityAs[Page[Climb]]
         assert(result.count === 4)
         assert(result.payload.toSet === initClimbs.slice(0,2).toSet)
       }
@@ -91,7 +94,7 @@ class ClimbRoutesApiSpec extends FeatureSpec
         assert(status === OK)
 
         And("it should contain the remaining climbs")
-        val result = entityAs[PagedResponse[Climb]]
+        val result = entityAs[Page[Climb]]
         assert(result.count === 4)
         assert(result.payload.toSet === initClimbs.slice(2,4).toSet)
       }
