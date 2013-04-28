@@ -4,7 +4,7 @@ import spray.http._
 import spray.http.HttpHeaders._
 import spray.routing.HttpService
 
-import org.freeclimbers.api.{Marshalling,JsonProtocols}
+import org.freeclimbers.api.{Marshalling,JsonProtocols,PageLimits}
 
 trait ApiRoutes extends HttpService
                 with Marshalling
@@ -12,4 +12,7 @@ trait ApiRoutes extends HttpService
 
   protected val TODO = complete(HttpResponse(StatusCodes.NotImplemented))
 
+  protected val pageLimitParams = parameters(
+    'limit.as[Long] ? 100L,
+    'offset.as[Long] ? 0L).as(PageLimits)
 }

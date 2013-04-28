@@ -17,6 +17,10 @@ class PageLinker(f: PageLimits => String) extends Function1[PageLimits, String] 
   def apply(paging: PageLimits): String = f(paging)
 }
 
+object PageLinker {
+  def apply(f: PageLimits => String) = new PageLinker(f)
+}
+
 case class Page[T](
     count: Long,
     payload: Seq[T],

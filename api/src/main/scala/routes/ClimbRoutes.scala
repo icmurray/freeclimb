@@ -6,17 +6,36 @@ import org.freeclimbers.api.controllers.ClimbControllerComponent
 trait ClimbRoutes extends ApiRoutes { this: ClimbControllerComponent =>
 
   val climbRoutes = {
-    path("climbs") {
-      get {
-        parameters('limit.as[Long] ? 100L, 'offset.as[Long] ? 0L).as(PageLimits) { paging =>
-          complete {
-            climbController.getPage(paging, climbsPageLinker)
+    pathPrefix("climbs") {
+      path ("") {
+        get {
+          pageLimitParams { paging =>
+            complete {
+              climbController.getPage(paging, climbsPageLinker)
+            }
           }
+        }
+      } ~
+      pathPrefix(LongNumber) { climbId =>
+        path ("") {
+          get { TODO } ~
+          put { TODO }
+        } ~
+        path ("changeCrag") {
+          put { TODO }
+        } ~
+        path ("changes" / "latest") {
+          get { TODO }
+        } ~
+        path ("changes" / LongNumber) { page =>
+          get { TODO }
         }
       }
     }
   }
 
-  val climbsPageLinker = new PageLinker ( paging => s"/climbs?limit=${paging.limit}&offset=${paging.offset}" )
+  val climbsPageLinker = PageLinker { paging =>
+    s"/climbs?limit=${paging.limit}&offset=${paging.offset}"
+  }
 
 }
