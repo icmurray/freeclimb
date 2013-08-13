@@ -7,7 +7,14 @@ object Freeclimbers extends Build {
     scalaVersion in ThisBuild := "2.10.2",
     organization in ThisBuild := "org.freeclimbers",
     javaOptions in ThisBuild  ++= Seq("-Xmx2G"),
-    scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature")
+    scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature"),
+    resolvers ++= Seq(
+      "Sonatype Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots",
+      "Sonatype Releases" at "http://oss.sonatype.org/content/repositories/releases"
+    ),
+    libraryDependencies ++= Seq(
+      "org.scalacheck" %% "scalacheck" % "1.10.1" % "test"
+    )
   )
 
   lazy val root = Project(id        = "freeclimbers",
