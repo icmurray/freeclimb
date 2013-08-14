@@ -11,6 +11,14 @@ case class Climb(
     val name: String,
     val description: String)
 
+object ClimbsReadModel {
+  def fromHistory(events: Seq[ClimbEvent]): ClimbsReadModel = {
+    events.foldLeft(ClimbsReadModel()) { (climbs, event) =>
+      climbs.applyEvent(event)
+    }
+  }
+}
+
 case class ClimbsReadModel(
     private val byId: Map[ClimbId, Climb] = Map()) {
 
