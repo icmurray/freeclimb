@@ -33,17 +33,17 @@ trait RoutesComponent {
               ???
             } ~
             put {
-              service.updateClimb(ClimbId(uuid), ???, ???)
+              service.updateClimb(ClimbId(uuid), ???, ???, ???)
               ???
             } ~
             delete {
-              service.deleteClimb(id)
+              service.deleteClimb(id, ???)
               ???
             }
           } ~
           path("moveToCrag") {
             put {
-              service.moveClimb(id, ???)
+              service.moveClimb(id, ???, ???)
               ???
             }
           }

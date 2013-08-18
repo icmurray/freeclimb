@@ -2,6 +2,7 @@ package org.freeclimbers.core
 
 import scala.util.{Try, Success, Failure}
 
+import org.freeclimbers.core.eventstore._
 import org.freeclimbers.core.queries.{DefaultClimbs, Climbs, Climb}
 
 trait ClimbServices {
@@ -13,25 +14,32 @@ trait ClimbServices {
                   name: String,
                   description: String): Try[ClimbId]
 
-  def deleteClimb(id: ClimbId): Try[Unit]
+  def deleteClimb(id: ClimbId, expected: Revision): Try[Unit]
 
   def updateClimb(id: ClimbId,
+                  expected: Revision,
                   name: String,
                   description: String): Try[Unit]
 
   def moveClimb(climbId: ClimbId,
+                expected: Revision,
                 toCragId: CragId): Try[Unit]
 
 }
 
 trait ClimbServiceComponent {
-  def climbs: Climbs
+
+  protected def climbs: Climbs
+  protected def climbStore: EventStore[ClimbEvent]
+
+  climbStore.subscribe(StoreRevision.initial) { commit =>
+    commit.events.foreach { climbs.applyEvent(_) }
+  }
 
   class ClimbServicesImpl extends ClimbServices {
 
     override def listClimbs(from: Int, to: Int) = {
-      val sorted = climbs.list.sortBy(_.name)
-      sorted.view(from, to)
+      climbs.list.sortBy(_.name).view(from, to)
     }
 
     override def getClimb(id: ClimbId) = climbs.get(id)
@@ -39,39 +47,82 @@ trait ClimbServiceComponent {
     override def createClimb(cragId: CragId,
                              name: String,
                              description: String) = {
+
       val climbId = ClimbId.generate()
-      climbs.applyEvent(ClimbCreated(
+      val event = ClimbCreated(
         climbId = climbId,
         cragId = cragId,
         name = name,
-        description = description))
-      Success(climbId)
+        description = description)
+
+      val result = climbStore.appendEvent(
+        stream = getStreamId(climbId),
+        expected = Revision.initial,
+        event = event)
+
+      result match {
+        case c: Commit[_] => Success(climbId)
+        case c: Conflict[_] => Failure(conflict)
+      }
     }
 
-    override def deleteClimb(id: ClimbId) = {
-      Success(climbs.applyEvent(ClimbDeleted(id)))
+    override def deleteClimb(id: ClimbId, expected: Revision) = {
+      val result = climbStore.appendEvent(
+        stream = getStreamId(id),
+        expected = expected,
+        event = ClimbDeleted(id))
+      result match {
+        case _: Commit[_]   => Success(())
+        case _: Conflict[_] => Failure(conflict)
+      }
     }
 
     override def updateClimb(id: ClimbId,
+                             expected: Revision,
                              name: String,
                              description: String) = {
-      Success(climbs.applyEvent(ClimbEdited(id, name, description)))
-    }
-
-    override def moveClimb(id: ClimbId, toCragId: CragId) = {
-      val oldCragIdO = getClimb(id).map(_.cragId)
-      oldCragIdO match {
-        case None   => Failure(new RuntimeException(
-                                s"Unknown climb id: ${id}"))
-        case Some(oldCragId) => Success(
-          climbs.applyEvent(ClimbMovedCrag(id, oldCragId, toCragId))
-        )
+      val result = climbStore.appendEvent(
+        stream = getStreamId(id),
+        expected = expected,
+        event = ClimbEdited(id, name, description))
+      result match {
+        case _: Commit[_]   => Success(())
+        case _: Conflict[_] => Failure(conflict)
       }
     }
+
+    override def moveClimb(id: ClimbId,
+                           expected: Revision,
+                           toCragId: CragId) = {
+
+
+      val oldCragIdO = getClimb(id).map(_.cragId)
+      oldCragIdO match {
+        case None   => Failure(new RuntimeException(s"Unknown climb id: ${id}"))
+        case Some(oldCragId) => {
+          val result = climbStore.appendEvent(
+            stream = getStreamId(id),
+            expected = expected,
+            event = ClimbMovedCrag(id, oldCragId, toCragId))
+          result match {
+            case _: Commit[_]   => Success(())
+            case _: Conflict[_] => Failure(conflict)
+          }
+        }
+      }
+    }
+
+    private def getStreamId(id: ClimbId) = {
+      StreamId(id.uuid.toString)
+    }
+
+    private def conflict = new RuntimeException("Conflict")
+
   }
 }
 
 class DefaultClimbServiceComponent extends ClimbServiceComponent {
-  override val climbs = new DefaultClimbs()
+  override lazy val climbs = new DefaultClimbs()
+  override lazy val climbStore: EventStore[ClimbEvent]  = ???
 }
 
