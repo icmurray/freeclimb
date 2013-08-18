@@ -15,14 +15,19 @@ object ClimbsSpecification extends Properties("Climbs") {
       events.last match {
         case ClimbCreated(_, cragId, name, desc) =>
           climbs.get(climbId) == Some(Climb(climbId, cragId, name, desc))
+          climbs.list == Seq(Climb(climbId, cragId, name, desc))
         case ClimbEdited(_, name, desc) => {
           climbs.get(climbId).get.name        == name &&
-          climbs.get(climbId).get.description == desc
+          climbs.get(climbId).get.description == desc &&
+          climbs.list.head.name               == name &&
+          climbs.list.head.description        == desc
         }
         case ClimbDeleted(_) =>
-          climbs.get(climbId) == None
+          climbs.get(climbId) == None &&
+          climbs.list.isEmpty
         case ClimbMovedCrag(_, _, toCragId) =>
-          climbs.get(climbId).get.cragId == toCragId
+          climbs.get(climbId).get.cragId == toCragId &&
+          climbs.list.head.cragId        == toCragId
       }
     }
   }

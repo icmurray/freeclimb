@@ -9,6 +9,7 @@ import org.freeclimbers.core.util.RichMap._
 
 trait Climbs {
   def get(id: ClimbId): Option[Climb]
+  def list: Seq[Climb]
   def applyEvent(e: ClimbEvent): Unit
 }
 
@@ -28,6 +29,10 @@ class DefaultClimbs extends Climbs {
 
   def get(id: ClimbId): Option[Climb] = atomic { implicit txn =>
     readModel().get(id)
+  }
+
+  def list = atomic { implicit txn =>
+    readModel().list
   }
 
   def applyEvent(event: ClimbEvent) = atomic { implicit txn =>
@@ -51,6 +56,8 @@ private case class ClimbsReadModel(
     private val byId: Map[ClimbId, Climb] = Map()) {
 
   def get(id: ClimbId): Option[Climb] = byId.get(id)
+
+  def list: Seq[Climb] = byId.values.toSeq
 
   def applyEvent(event: ClimbEvent) = event match {
 

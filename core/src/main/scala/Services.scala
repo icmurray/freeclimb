@@ -2,12 +2,12 @@ package org.freeclimbers.core
 
 import scala.util.{Try, Success, Failure}
 
-import org.freeclimbers.core.queries.{DefaultClimbs, Climbs}
+import org.freeclimbers.core.queries.{DefaultClimbs, Climbs, Climb}
 
 trait ClimbServices {
 
-  def listClimbs(from: Int, to: Int): Seq[ClimbId]
-  def getClimb(id: ClimbId): Option[ClimbId]
+  def listClimbs(from: Int, to: Int): Seq[Climb]
+  def getClimb(id: ClimbId): Option[Climb]
 
   def createClimb(cragId: CragId,
                   name: String,
@@ -29,9 +29,12 @@ trait ClimbServiceComponent {
 
   class ClimbServicesImpl extends ClimbServices {
 
-    override def listClimbs(from: Int, to: Int) = ???
+    override def listClimbs(from: Int, to: Int) = {
+      val sorted = climbs.list.sortBy(_.name)
+      sorted.view(from, to)
+    }
 
-    override def getClimb(id: ClimbId) = climbs.get(id).map(_.climbId)
+    override def getClimb(id: ClimbId) = climbs.get(id)
 
     override def createClimb(cragId: CragId,
                              name: String,
@@ -55,7 +58,16 @@ trait ClimbServiceComponent {
       Success(climbs.applyEvent(ClimbEdited(id, name, description)))
     }
 
-    override def moveClimb(id: ClimbId, toCragId: CragId) = ???
+    override def moveClimb(id: ClimbId, toCragId: CragId) = {
+      val oldCragIdO = getClimb(id).map(_.cragId)
+      oldCragIdO match {
+        case None   => Failure(new RuntimeException(
+                                s"Unknown climb id: ${id}"))
+        case Some(oldCragId) => Success(
+          climbs.applyEvent(ClimbMovedCrag(id, oldCragId, toCragId))
+        )
+      }
+    }
   }
 }
 
