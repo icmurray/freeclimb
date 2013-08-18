@@ -23,7 +23,11 @@ object Freeclimbers extends Build {
 
   lazy val core = Project(id        = "freeclimbers-core",
                           base      = file("core"),
-                          settings  = globalSettings)
+                          settings  = globalSettings ++ Seq(
+                            libraryDependencies ++= Seq(
+                              "org.scala-stm" %% "scala-stm" % "0.7"
+                            )
+                          ))
 
   //lazy val api  = Project(id        = "freeclimbers-api",
   //                        base      = file("api"),

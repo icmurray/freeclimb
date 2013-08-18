@@ -11,7 +11,7 @@ object ClimbsSpecification extends Properties("Climbs") {
   property("applyEvent") = {
     val climbId = ClimbId.generate()
     forAll(arbitrary(eventsForSingleClimb(climbId))) { events =>
-      val climbs = ClimbsReadModel.fromHistory(events)
+      val climbs = DefaultClimbs.fromHistory(events)
       events.last match {
         case ClimbCreated(_, cragId, name, desc) =>
           climbs.get(climbId) == Some(Climb(climbId, cragId, name, desc))
