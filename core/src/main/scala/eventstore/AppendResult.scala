@@ -7,11 +7,11 @@ sealed trait AppendResult[+E] {
 }
 
 case class Commit[+E](
-    timestamp: DateTime,
     storeRevision: StoreRevision,
     streamId: StreamId,
     streamRevision: Revision,
-    events: Seq[E]) extends AppendResult[E]
+    events: Seq[E],
+    timestamp: DateTime = new DateTime()) extends AppendResult[E]
 
 case class Conflict[+E](
     streamId: StreamId,

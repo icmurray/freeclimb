@@ -5,5 +5,5 @@ case class Revision(value: Long) {
 }
 
 object Revision {
-  val initial = Revision(1)
+  val initial = Revision(0)
 }

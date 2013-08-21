@@ -14,4 +14,3 @@ trait EventStore[E] {
   def allCommits(from: StoreRevision, to: StoreRevision): Stream[Commit[E]]
   def streamCommits(stream: StreamId, from: Revision, to: Revision): Stream[Commit[E]]
 }
-

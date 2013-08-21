@@ -5,7 +5,7 @@ case class StoreRevision(value: Long) {
 }
 
 object StoreRevision {
-  val initial = StoreRevision(1L)
+  val initial = StoreRevision(0L)
 }
 
 
