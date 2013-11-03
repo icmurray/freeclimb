@@ -46,9 +46,22 @@ object User {
     )(User.apply _)
   }
 
-  private final def validateEmail(email: Email): Validated[Email] = email.success
-  private final def validateFirstName(name: String): Validated[String] = name.success
-  private final def validateLastName(name: String): Validated[String] = name.success
+  private val naiveEmailRx = """^[^@]+@.+""".r
+  private final def validateEmail(email: Email) = {
+    naiveEmailRx findFirstIn email.s match {
+      case Some(_) => email.success
+      case None    => List("Invalid Email").failure
+    }
+  }
+
+  private final def validateFirstName(name: String) = {
+    name.trim match {
+      case "" => List("First name must not be empty").failure
+      case s  => s.success
+    }
+  }
+
+  private final def validateLastName(name: String) = name.success
 
   protected def hash(password: PlainText): Digest = {
     Digest(BCrypt.hashpw(password.s, BCrypt.gensalt()))
