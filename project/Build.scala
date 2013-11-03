@@ -4,7 +4,7 @@ import Keys._
 object Freeclimbers extends Build {
 
   lazy val globalSettings = Defaults.defaultSettings ++ Seq(
-    scalaVersion in ThisBuild := "2.10.2",
+    scalaVersion in ThisBuild := "2.10.3",
     organization in ThisBuild := "org.freeclimbers",
     javaOptions in ThisBuild  ++= Seq("-Xmx2G"),
     scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature")
@@ -16,7 +16,13 @@ object Freeclimbers extends Build {
 
   lazy val core = Project(id        = "freeclimbers-core",
                           base      = file("core"),
-                          settings  = globalSettings)
+                          settings  = globalSettings ++ Seq(
+                            libraryDependencies ++= Seq(
+                              "org.scalaz"    %% "scalaz-core" % "7.0.4",
+                              "org.mindrot"   % "jbcrypt"      % "0.3m",
+                              "org.scalatest" %% "scalatest"   % "1.9.2" % "test"
+                            )
+                          ))
 
   //lazy val api  = Project(id        = "freeclimbers-api",
   //                        base      = file("api"),
