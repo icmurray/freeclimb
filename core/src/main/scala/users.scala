@@ -9,7 +9,7 @@ import scala.language.higherKinds
 import org.mindrot.jbcrypt.BCrypt
 
 import scalaz._
-import scalaz.syntax.validation._
+import Scalaz._
 
 case class UserId(uuid: UUID) extends AnyVal
 
@@ -31,6 +31,35 @@ case class User(
     lastName: String,
     password: Digest)
 
+object User {
+  def apply(email: Email,
+            firstName: String,
+            lastName: String,
+            pass: PlainText): Validated[User] = {
+
+    (
+      UserId.createRandom().success[DomainError] |@|
+      validateEmail(email)                       |@|
+      validateFirstName(firstName)               |@|
+      validateLastName(lastName)                 |@|
+      hash(pass).success
+    )(User.apply _)
+  }
+
+  private final def validateEmail(email: Email): Validated[Email] = email.success
+  private final def validateFirstName(name: String): Validated[String] = name.success
+  private final def validateLastName(name: String): Validated[String] = name.success
+
+  protected def hash(password: PlainText): Digest = {
+    Digest(BCrypt.hashpw(password.s, BCrypt.gensalt()))
+  }
+
+  protected def check(candidate: PlainText, digest: Digest): Boolean = {
+    BCrypt.checkpw(candidate.s, digest.s)
+  }
+
+}
+
 trait UsersModule[M[+_]] {
 
   implicit def M: Monad[M]
@@ -45,14 +74,6 @@ trait UsersModule[M[+_]] {
 
     def login(email: Email,
               password: PlainText): M[Validated[UserToken]]
-
-    protected def hash(password: PlainText): Digest = {
-      Digest(BCrypt.hashpw(password.s, BCrypt.gensalt()))
-    }
-
-    protected def check(candidate: PlainText, digest: Digest): Boolean = {
-      BCrypt.checkpw(candidate.s, digest.s)
-    }
 
   }
 
@@ -73,14 +94,17 @@ trait InMemoryUsersModule[M[+_]] extends UsersModule[M] {
 
     def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
       // TODO: flesh out validation
-      users.values.find(_.email == email) match {
-        case None =>
-          val userId = UserId.createRandom()
-          val user = User(userId, email, firstName, lastName, hash(pass))
-          users += (userId -> user)
-          M.pure(user.success)
-        case Some(_) =>
-          M.pure(List("User already exists").failure)
+      M.pure {
+        users.values.find(_.email == email) match {
+          case None =>
+            val userV = User(email, firstName, lastName, pass)
+            userV.foreach { user =>
+              users += (user.id -> user)
+            }
+            userV
+          case Some(_) =>
+            List("User already exists").failure
+        }
       }
     }
 
