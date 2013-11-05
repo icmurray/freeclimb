@@ -11,6 +11,11 @@ import org.mindrot.jbcrypt.BCrypt
 import scalaz._
 import Scalaz._
 
+sealed trait UserEvent
+case class UserRegistered(user: User) extends UserEvent
+case class UserLoggedIn(user: User) extends UserEvent
+case class UserLoggedOut(user: User) extends UserEvent
+
 case class UserId(uuid: UUID) extends AnyVal
 
 object UserId {
@@ -87,6 +92,84 @@ trait UsersModule[M[+_]] {
 
     def login(email: Email,
               password: PlainText): M[Validated[UserToken]]
+
+  }
+
+}
+
+trait ActorUsersModule extends UsersModule[Future] {
+
+  import akka.actor._
+  import akka.pattern.ask
+  import akka.persistence._
+  import akka.util.Timeout
+  import scala.concurrent.duration._
+
+  private sealed trait Cmd
+
+  private case class RegisterCmd(
+      email: Email,
+      firstName: String,
+      lastName: String,
+      pass: PlainText) extends Cmd
+
+  private case class LoginCmd(
+      email: Email,
+      pass: PlainText) extends Cmd
+
+  private class Processor extends EventsourcedProcessor {
+
+    private[this] val usersById    = m.Map[UserId, User]()
+    private[this] val usersByEmail = m.Map[Email, User]()
+
+    private[this] def updateState(e: UserEvent) = ???
+
+    val receiveReplay: Receive = {
+      case evt: UserEvent => updateState(evt)
+    }
+
+    val receiveCommand: Receive = {
+
+      case RegisterCmd(email, fN, lN, pass) =>
+        usersByEmail.get(email) match {
+
+          case None =>
+            val userV = User(email, fN, lN, pass)
+            userV.fold (
+              { failure =>
+                sender ! userV
+              },
+
+              { user =>
+                persist(UserRegistered(user)) { event =>
+                  updateState(event)
+                  sender ! userV
+                }
+              }
+            )
+
+          case Some(_) =>
+            sender ! List("User already exists").failure
+        }
+    }
+
+  }
+
+  val system: ActorSystem
+  val users = new Impl()
+
+  class Impl extends UserService {
+
+    private val processor = system.actorOf(Props[Processor], "user-processor")
+    private implicit val timeout = Timeout(5.seconds)
+
+    def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
+      val f = processor ? RegisterCmd(email, firstName, lastName, pass)
+      f.mapTo[Validated[User]]
+    }
+
+    def login(email: Email,
+              password: PlainText): Future[Validated[UserToken]] = ???
 
   }
 

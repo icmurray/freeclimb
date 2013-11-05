@@ -18,9 +18,11 @@ object Freeclimbers extends Build {
                           base      = file("core"),
                           settings  = globalSettings ++ Seq(
                             libraryDependencies ++= Seq(
-                              "org.scalaz"    %% "scalaz-core" % "7.0.4",
-                              "org.mindrot"   % "jbcrypt"      % "0.3m",
-                              "org.scalatest" %% "scalatest"   % "1.9.2" % "test"
+                              "org.scalaz"        %% "scalaz-core" % "7.0.4",
+                              "org.mindrot"       % "jbcrypt"      % "0.3m",
+                              "com.typesafe.akka" %% "akka-actor"  % "2.3-M1",
+                              "com.typesafe.akka" %% "akka-persistence-experimental" % "2.3-M1",
+                              "org.scalatest"     %% "scalatest"   % "1.9.2" % "test"
                             )
                           ))
 
