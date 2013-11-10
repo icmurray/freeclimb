@@ -12,15 +12,16 @@ import scalaz._
 import Scalaz._
 
 case class UserId(uuid: UUID) extends AnyVal
-
 object UserId {
-  def createRandom() = {
-    UserId(UUID.randomUUID)
-  }
+  def createRandom() = UserId(UUID.randomUUID)
+}
+
+case class UserToken(uuid: UUID) extends AnyVal
+object UserToken {
+  def generate() = UserToken(UUID.randomUUID())
 }
 
 case class Email(s: String) extends AnyVal
-case class UserToken(uuid: UUID) extends AnyVal
 case class PlainText(s: String) extends AnyVal
 case class Digest(s: String) extends AnyVal
 
@@ -43,8 +44,20 @@ case class UserRegistered(
 
 }
 
-//case class UserLoggedIn(user: User) extends UserEvent
-//case class UserLoggedOut(user: User) extends UserEvent
+case class UserLoggedIn(id: UserId, token: UserToken) extends UserEvent
+case class UserLoggedOut(id: UserId, token: UserToken) extends UserEvent
+
+object Password {
+
+  def hash(password: PlainText): Digest = {
+    Digest(BCrypt.hashpw(password.s, BCrypt.gensalt()))
+  }
+
+  def check(candidate: PlainText, digest: Digest): Boolean = {
+    BCrypt.checkpw(candidate.s, digest.s)
+  }
+
+}
 
 object UserRegistered {
   def apply(email: Email,
@@ -57,7 +70,7 @@ object UserRegistered {
       validateEmail(email)                       |@|
       validateFirstName(firstName)               |@|
       validateLastName(lastName)                 |@|
-      hash(pass).success
+      Password.hash(pass).success
     )(UserRegistered.apply _)
   }
 
@@ -78,14 +91,6 @@ object UserRegistered {
 
   private final def validateLastName(name: String) = name.success
 
-  protected def hash(password: PlainText): Digest = {
-    Digest(BCrypt.hashpw(password.s, BCrypt.gensalt()))
-  }
-
-  protected def check(candidate: PlainText, digest: Digest): Boolean = {
-    BCrypt.checkpw(candidate.s, digest.s)
-  }
-
 }
 
 trait UsersModule[M[+_]] {
@@ -101,8 +106,12 @@ trait UsersModule[M[+_]] {
                  pass: PlainText): M[Validated[User]]
 
     def login(email: Email,
-              password: PlainText): M[Validated[UserToken]]
+              password: PlainText): M[Option[UserToken]]
 
+    def logout(email: Email, token: UserToken): M[Unit]
+
+    def authenticate(email: Email, password: PlainText): M[Option[User]]
+    def authenticate(email: Email, token: UserToken): M[Option[User]]
   }
 
 }
@@ -131,8 +140,21 @@ trait ActorUsersModule extends UsersModule[Future] {
     }
 
     def login(email: Email,
-              password: PlainText): Future[Validated[UserToken]] = ???
+              password: PlainText): Future[Option[UserToken]] = {
+      (processor ? LoginCmd(email, password)).mapTo[Option[UserToken]]
+    }
 
+    def logout(email: Email, token: UserToken): Future[Unit] = {
+      (processor ? LogoutCmd(email, token)).mapTo[Unit]
+    }
+
+    def authenticate(email: Email, password: PlainText): Future[Option[User]] = {
+      (processor ? PasswordAuth(email, password)).mapTo[Option[User]]
+    }
+
+    def authenticate(email: Email, token: UserToken): Future[Option[User]] = {
+      (processor ? TokenAuth(email, token)).mapTo[Option[User]]
+    }
   }
 
   /**
@@ -144,13 +166,13 @@ trait ActorUsersModule extends UsersModule[Future] {
       firstName: String,
       lastName: String,
       pass: PlainText) extends Cmd {
-
     def validate = UserRegistered(email, firstName, lastName, pass)
   }
 
-  //private case class LoginCmd(
-  //    email: Email,
-  //    pass: PlainText) extends Cmd
+  private case class PasswordAuth(email: Email, pass: PlainText) extends Cmd
+  private case class TokenAuth(email: Email, token: UserToken) extends Cmd
+  private case class LoginCmd(email: Email, pass: PlainText) extends Cmd
+  private case class LogoutCmd(email: Email, token: UserToken) extends Cmd
 
   private class Processor extends EventsourcedProcessor {
 
@@ -159,6 +181,10 @@ trait ActorUsersModule extends UsersModule[Future] {
     private[this] def updateState(e: UserEvent) = e match {
       case e: UserRegistered =>
         usersImage = usersImage.addUser(e.createUser)
+      case UserLoggedIn(id, token) =>
+        usersImage = usersImage.login(id, token)
+      case UserLoggedOut(id, token) =>
+        usersImage = usersImage.logout(id, token)
     }
 
     /**
@@ -178,6 +204,63 @@ trait ActorUsersModule extends UsersModule[Future] {
     val receiveCommand: Receive = {
       case cmd: RegisterCmd =>
         handleRegister(cmd)
+      case cmd: PasswordAuth =>
+        handlePasswordAuth(cmd)
+      case cmd: LoginCmd =>
+        handleLogin(cmd)
+      case cmd: TokenAuth =>
+        handleTokenAuth(cmd)
+      case cmd: LogoutCmd =>
+        handleLogout(cmd)
+    }
+
+    private[this] def handleLogin(cmd: LoginCmd) = {
+      authenticate(cmd.email, cmd.pass) match {
+        case None       => sender ! None
+        case Some(user) => {
+          val token = UserToken.generate()
+          val event = UserLoggedIn(user.id, token)
+          persist(event) { e =>
+            updateState(e)
+            sender ! Some(token)
+          }
+        }
+      }
+    }
+
+    private[this] def handleLogout(cmd: LogoutCmd) = {
+      usersImage.tokens.get(cmd.token) match {
+        case None       => sender ! {}
+        case Some(user) => {
+          val event = UserLoggedOut(user.id, cmd.token)
+          persist(event) { e =>
+            updateState(e)
+            sender ! {}
+          }
+        }
+      }
+    }
+
+    private[this] def authenticate(email: Email, pass: PlainText) = {
+      for {
+        user <- usersImage.byEmail.get(email)
+        if Password.check(pass, user.password)
+      } yield user
+    }
+
+    private[this] def authenticate(email: Email, token: UserToken) = {
+      for {
+        user <- usersImage.tokens.get(token)
+        if user.email == email
+      } yield user
+    }
+
+    private[this] def handlePasswordAuth(cmd: PasswordAuth) = {
+      sender ! authenticate(cmd.email, cmd.pass)
+    }
+
+    private[this] def handleTokenAuth(cmd: TokenAuth) = {
+      sender ! authenticate(cmd.email, cmd.token)
     }
 
     private[this] def handleRegister(cmd: RegisterCmd) = {
@@ -202,12 +285,28 @@ trait ActorUsersModule extends UsersModule[Future] {
 
     private case class UsersImage(
         byId: Map[UserId, User] = Map(),
-        byEmail: Map[Email, User] = Map()) {
+        byEmail: Map[Email, User] = Map(),
+        tokens: Map[UserToken, User] = Map()) {
 
       def addUser(user: User): UsersImage = {
         UsersImage(
           byId + (user.id -> user),
-          byEmail + (user.email -> user))
+          byEmail + (user.email -> user),
+          tokens)
+      }
+
+      def login(id: UserId, token: UserToken): UsersImage = {
+        val user = byId(id)
+        UsersImage(
+          byId, byEmail,
+          tokens + (token -> user))
+      }
+
+      def logout(id: UserId, token: UserToken): UsersImage = {
+        val user = byId(id)
+        UsersImage(
+          byId, byEmail,
+          tokens - token)
       }
 
     }

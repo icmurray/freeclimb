@@ -51,11 +51,97 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  //trait TestUsersModule extends InMemoryUsersModule[Id] {
-  //  val M = Monad[Id]
-  //}
+  "A UserService" should "allow a user to authenticate with password" in {
+    withUsersModule { module =>
+      implicit val ec = module.ec
 
-  private def withUsersModule(f: UsersModule[Future] => Unit) = {
+      val authF = for {
+        userV <- module.users.register(
+          Email("test@example.com"), "Test", "User", PlainText("pass")
+        )
+        user = userV.getOrElse(throw new RuntimeException())
+
+        auth <- module.users.authenticate(user.email, PlainText("pass"))
+      } yield auth
+
+      val auth = Await.result(authF, 2.seconds)
+      auth should not equal (None)
+      auth.get.email should equal (Email("test@example.com"))
+    }
+  }
+
+  "A UserService" should "not allow a user to authenticate with the wrong password" in {
+    withUsersModule { module =>
+      implicit val ec = module.ec
+
+      val authF = for {
+        userV <- module.users.register(
+          Email("test@example.com"), "Test", "User", PlainText("pass")
+        )
+        user = userV.getOrElse(throw new RuntimeException())
+
+        auth <- module.users.authenticate(user.email, PlainText("WRONG"))
+      } yield auth
+
+      val auth = Await.result(authF, 2.seconds)
+      auth should equal (None)
+    }
+  }
+
+  "A UserService" should "allow users to log in and out" in {
+    withUsersModule { module =>
+      implicit val ec = module.ec
+
+      val tokenF = for {
+        userV <- module.users.register(
+          Email("test@example.com"), "Test", "User", PlainText("pass")
+        )
+        user = userV.getOrElse(throw new RuntimeException())
+
+        tokenO <- module.users.login(user.email, PlainText("pass"))
+      } yield tokenO.get
+
+      val token = Await.result(tokenF, 2.seconds)
+
+      val authF = module.users.authenticate(Email("test@example.com"), token)
+      val auth = Await.result(authF, 2.seconds)
+
+      auth should not equal (None)
+      auth.get.email should equal (Email("test@example.com"))
+
+      Await.result(
+        module.users.logout(Email("test@example.com"), token),
+        2.seconds)
+
+      val authAgainF = module.users.authenticate(Email("test@example.com"), token)
+      val authAgain = Await.result(authAgainF, 2.seconds)
+      authAgain should equal (None)
+    }
+  }
+
+  "A UserService" should "allow users to log in with other user's tokens" in {
+    withUsersModule { module =>
+      implicit val ec = module.ec
+
+      val tokenF = for {
+        userV <- module.users.register(
+          Email("test@example.com"), "Test", "User", PlainText("pass")
+        )
+        user = userV.getOrElse(throw new RuntimeException())
+
+        tokenO <- module.users.login(user.email, PlainText("pass"))
+      } yield tokenO.get
+
+      val token = Await.result(tokenF, 2.seconds)
+
+      val authF = module.users.authenticate(Email("not-test@example.com"), token)
+      val auth = Await.result(authF, 2.seconds)
+
+      auth should equal (None)
+    }
+  }
+
+  private def withUsersModule(f: UsersModule[Future] with ActorSystemModule => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
       val module = new ActorUsersModule with ActorSystemModule {
