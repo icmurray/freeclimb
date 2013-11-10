@@ -108,6 +108,7 @@ trait UsersModule[M[+_]] {
 }
 
 trait ActorUsersModule extends UsersModule[Future] {
+  this: ActorSystemModule =>
 
   import akka.actor._
   import akka.pattern.ask
@@ -115,8 +116,29 @@ trait ActorUsersModule extends UsersModule[Future] {
   import akka.util.Timeout
   import scala.concurrent.duration._
 
-  private sealed trait Cmd
+  val users = new Impl()
 
+  class Impl extends UserService {
+
+    private[this] val processor = {
+      actorSystem.actorOf(Props(new Processor()), name = "user-processor")
+    }
+
+    private[this] implicit val timeout = Timeout(5.seconds)
+
+    def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
+      (processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]]
+    }
+
+    def login(email: Email,
+              password: PlainText): Future[Validated[UserToken]] = ???
+
+  }
+
+  /**
+   * The commands that control the Processor
+   */
+  private sealed trait Cmd
   private case class RegisterCmd(
       email: Email,
       firstName: String,
@@ -132,6 +154,52 @@ trait ActorUsersModule extends UsersModule[Future] {
 
   private class Processor extends EventsourcedProcessor {
 
+    private[this] var usersImage = UsersImage()
+
+    private[this] def updateState(e: UserEvent) = e match {
+      case e: UserRegistered =>
+        usersImage = usersImage.addUser(e.createUser)
+    }
+
+    /**
+     * Handling *re-played* events.
+     */
+    val receiveReplay: Receive = {
+      case evt: UserEvent =>
+        updateState(evt)
+
+      case SnapshotOffer(_, snapshot: UsersImage) =>
+        usersImage = snapshot
+    }
+
+    /**
+     * Handling external commands.
+     */
+    val receiveCommand: Receive = {
+      case cmd: RegisterCmd =>
+        handleRegister(cmd)
+    }
+
+    private[this] def handleRegister(cmd: RegisterCmd) = {
+      val eventV = cmd.validate
+      eventV.fold(
+        invalid => sender ! eventV,
+        event   => {
+          val user = event.createUser
+          usersImage.byEmail.get(user.email) match {
+            case Some(_) =>
+              sender ! List("User already exists").failure
+
+            case None =>
+              persist(event) { e =>
+                updateState(e)
+                sender ! user.success
+              }
+          }
+        }
+      )
+    }
+
     private case class UsersImage(
         byId: Map[UserId, User] = Map(),
         byEmail: Map[Email, User] = Map()) {
@@ -143,63 +211,6 @@ trait ActorUsersModule extends UsersModule[Future] {
       }
 
     }
-
-    private[this] var usersImage = UsersImage()
-
-    private[this] def updateState(e: UserEvent) = e match {
-      case e: UserRegistered =>
-        usersImage = usersImage.addUser(e.createUser)
-    }
-
-    val receiveReplay: Receive = {
-
-      case evt: UserEvent =>
-        updateState(evt)
-
-      case SnapshotOffer(_, snapshot: UsersImage) =>
-        usersImage = snapshot
-    }
-
-    val receiveCommand: Receive = {
-
-      case cmd: RegisterCmd =>
-        val eventV = cmd.validate
-        eventV.fold(
-          invalid => sender ! eventV,
-          event   => {
-            val user = event.createUser
-            usersImage.byEmail.get(user.email) match {
-
-              case Some(_) =>
-                sender ! List("User already exists").failure
-
-              case None =>
-                persist(event) { e =>
-                  updateState(e)
-                  sender ! user.success
-                }
-            }
-          }
-        )
-    }
-
-  }
-
-  val actorSystem: ActorSystem
-  implicit val ec = actorSystem.dispatcher
-  val users = new Impl()
-
-  class Impl extends UserService {
-
-    private val processor = actorSystem.actorOf(Props(new Processor()), name = "user-processor")
-    private implicit val timeout = Timeout(5.seconds)
-
-    def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
-      (processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]]
-    }
-
-    def login(email: Email,
-              password: PlainText): Future[Validated[UserToken]] = ???
 
   }
 
