@@ -3,7 +3,7 @@ package org.freeclimbers.core
 import java.util.UUID
 
 import scala.collection.{mutable => m}
-import scala.concurrent.Future
+import scala.concurrent.{Future, future}
 import scala.language.higherKinds
 
 import org.mindrot.jbcrypt.BCrypt
@@ -53,8 +53,8 @@ object User {
 
   private val naiveEmailRx = """^[^@]+@.+""".r
   private final def validateEmail(email: Email) = {
-    naiveEmailRx findFirstIn email.s match {
-      case Some(_) => email.success
+    naiveEmailRx findFirstIn email.s.trim match {
+      case Some(s) => Email(s).success
       case None    => List("Invalid Email").failure
     }
   }
@@ -108,10 +108,7 @@ trait ActorUsersModule extends UsersModule[Future] {
   private sealed trait Cmd
 
   private case class RegisterCmd(
-      email: Email,
-      firstName: String,
-      lastName: String,
-      pass: PlainText) extends Cmd
+      user: User) extends Cmd
 
   private case class LoginCmd(
       email: Email,
@@ -119,34 +116,44 @@ trait ActorUsersModule extends UsersModule[Future] {
 
   private class Processor extends EventsourcedProcessor {
 
-    private[this] val usersById    = m.Map[UserId, User]()
-    private[this] val usersByEmail = m.Map[Email, User]()
+    private case class UsersImage(
+        byId: Map[UserId, User] = Map(),
+        byEmail: Map[Email, User] = Map()) {
 
-    private[this] def updateState(e: UserEvent) = ???
+      def addUser(user: User): UsersImage = {
+        UsersImage(
+          byId + (user.id -> user),
+          byEmail + (user.email -> user))
+      }
+
+    }
+
+    private[this] var usersImage = UsersImage()
+
+    private[this] def updateState(e: UserEvent) = e match {
+      case UserRegistered(user) =>
+        usersImage = usersImage.addUser(user)
+    }
 
     val receiveReplay: Receive = {
-      case evt: UserEvent => updateState(evt)
+
+      case evt: UserEvent =>
+        updateState(evt)
+
+      case SnapshotOffer(_, snapshot: UsersImage) =>
+        usersImage = snapshot
     }
 
     val receiveCommand: Receive = {
 
-      case RegisterCmd(email, fN, lN, pass) =>
-        usersByEmail.get(email) match {
+      case RegisterCmd(user) =>
+        usersImage.byEmail.get(user.email) match {
 
           case None =>
-            val userV = User(email, fN, lN, pass)
-            userV.fold (
-              { failure =>
-                sender ! userV
-              },
-
-              { user =>
-                persist(UserRegistered(user)) { event =>
-                  updateState(event)
-                  sender ! userV
-                }
-              }
-            )
+            persist(UserRegistered(user)) { event =>
+              updateState(event)
+              sender ! user.success
+            }
 
           case Some(_) =>
             sender ! List("User already exists").failure
@@ -155,17 +162,20 @@ trait ActorUsersModule extends UsersModule[Future] {
 
   }
 
-  val system: ActorSystem
+  val actorSystem: ActorSystem
+  implicit val ec = actorSystem.dispatcher
   val users = new Impl()
 
   class Impl extends UserService {
 
-    private val processor = system.actorOf(Props[Processor], "user-processor")
+    private val processor = actorSystem.actorOf(Props(new Processor()), name = "user-processor")
     private implicit val timeout = Timeout(5.seconds)
 
     def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
-      val f = processor ? RegisterCmd(email, firstName, lastName, pass)
-      f.mapTo[Validated[User]]
+      User(email, firstName, lastName, pass).fold(
+        invalid => future { invalid.failure },
+        user    => (processor ? RegisterCmd(user)).mapTo[Validated[User]]
+      )
     }
 
     def login(email: Email,
