@@ -20,11 +20,10 @@ import com.typesafe.config.ConfigFactory
 class UserServiceSpec extends FlatSpec with ShouldMatchers {
 
   "A UserService" should "register new users" in {
-
     withUsersModule { module =>
       val userF = module.users.register(
         Email("test@example.com"), "Test", "User", PlainText("pass"))
-      val user = Await.result(userF, 5.seconds)
+      val user = Await.result(userF, 2.seconds)
       user.isSuccess should equal (true)
     }
   }
@@ -33,19 +32,28 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
     withUsersModule { module =>
       val userF = module.users.register(
         Email("test@example.com"), "Test", "User", PlainText("pass"))
-      val user = Await.result(userF, 5.seconds)
+      val user = Await.result(userF, 1.seconds)
       user.isSuccess should equal (true)
 
       val sameUserF = module.users.register(
         Email(" test@example.com "), "Test", "User", PlainText("pass"))
-      val sameUser = Await.result(sameUserF, 5.seconds)
+      val sameUser = Await.result(sameUserF, 1.seconds)
       sameUser.isSuccess should equal(false)
     }
   }
 
-  trait TestUsersModule extends InMemoryUsersModule[Id] {
-    val M = Monad[Id]
+  "A UserService" should "not allow blank emails" in {
+    withUsersModule { module =>
+      val userF = module.users.register(
+        Email("  "), "Test", "User", PlainText("pass"))
+      val user = Await.result(userF, 1.seconds)
+      user.isSuccess should equal (false)
+    }
   }
+
+  //trait TestUsersModule extends InMemoryUsersModule[Id] {
+  //  val M = Monad[Id]
+  //}
 
   private def withUsersModule(f: UsersModule[Future] => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)

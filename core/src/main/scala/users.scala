@@ -11,11 +11,6 @@ import org.mindrot.jbcrypt.BCrypt
 import scalaz._
 import Scalaz._
 
-sealed trait UserEvent
-case class UserRegistered(user: User) extends UserEvent
-case class UserLoggedIn(user: User) extends UserEvent
-case class UserLoggedOut(user: User) extends UserEvent
-
 case class UserId(uuid: UUID) extends AnyVal
 
 object UserId {
@@ -36,11 +31,26 @@ case class User(
     lastName: String,
     password: Digest)
 
-object User {
+sealed trait UserEvent
+case class UserRegistered(
+    id: UserId,
+    email: Email,
+    firstName: String,
+    lastName: String,
+    password: Digest) extends UserEvent {
+
+  def createUser = User(id, email, firstName, lastName, password)
+
+}
+
+//case class UserLoggedIn(user: User) extends UserEvent
+//case class UserLoggedOut(user: User) extends UserEvent
+
+object UserRegistered {
   def apply(email: Email,
             firstName: String,
             lastName: String,
-            pass: PlainText): Validated[User] = {
+            pass: PlainText): Validated[UserRegistered] = {
 
     (
       UserId.createRandom().success[DomainError] |@|
@@ -48,7 +58,7 @@ object User {
       validateFirstName(firstName)               |@|
       validateLastName(lastName)                 |@|
       hash(pass).success
-    )(User.apply _)
+    )(UserRegistered.apply _)
   }
 
   private val naiveEmailRx = """^[^@]+@.+""".r
@@ -108,11 +118,17 @@ trait ActorUsersModule extends UsersModule[Future] {
   private sealed trait Cmd
 
   private case class RegisterCmd(
-      user: User) extends Cmd
-
-  private case class LoginCmd(
       email: Email,
-      pass: PlainText) extends Cmd
+      firstName: String,
+      lastName: String,
+      pass: PlainText) extends Cmd {
+
+    def validate = UserRegistered(email, firstName, lastName, pass)
+  }
+
+  //private case class LoginCmd(
+  //    email: Email,
+  //    pass: PlainText) extends Cmd
 
   private class Processor extends EventsourcedProcessor {
 
@@ -131,8 +147,8 @@ trait ActorUsersModule extends UsersModule[Future] {
     private[this] var usersImage = UsersImage()
 
     private[this] def updateState(e: UserEvent) = e match {
-      case UserRegistered(user) =>
-        usersImage = usersImage.addUser(user)
+      case e: UserRegistered =>
+        usersImage = usersImage.addUser(e.createUser)
     }
 
     val receiveReplay: Receive = {
@@ -146,18 +162,25 @@ trait ActorUsersModule extends UsersModule[Future] {
 
     val receiveCommand: Receive = {
 
-      case RegisterCmd(user) =>
-        usersImage.byEmail.get(user.email) match {
+      case cmd: RegisterCmd =>
+        val eventV = cmd.validate
+        eventV.fold(
+          invalid => sender ! eventV,
+          event   => {
+            val user = event.createUser
+            usersImage.byEmail.get(user.email) match {
 
-          case None =>
-            persist(UserRegistered(user)) { event =>
-              updateState(event)
-              sender ! user.success
+              case Some(_) =>
+                sender ! List("User already exists").failure
+
+              case None =>
+                persist(event) { e =>
+                  updateState(e)
+                  sender ! user.success
+                }
             }
-
-          case Some(_) =>
-            sender ! List("User already exists").failure
-        }
+          }
+        )
     }
 
   }
@@ -172,10 +195,7 @@ trait ActorUsersModule extends UsersModule[Future] {
     private implicit val timeout = Timeout(5.seconds)
 
     def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
-      User(email, firstName, lastName, pass).fold(
-        invalid => future { invalid.failure },
-        user    => (processor ? RegisterCmd(user)).mapTo[Validated[User]]
-      )
+      (processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]]
     }
 
     def login(email: Email,
@@ -188,36 +208,36 @@ trait ActorUsersModule extends UsersModule[Future] {
 /**
  * This is **FULL** of race conditions.
  */
-trait InMemoryUsersModule[M[+_]] extends UsersModule[M] {
-
-  val users = new Impl()
-
-  class Impl extends UserService {
-
-    private[this] val users: m.Map[UserId, User] = {
-      new m.HashMap[UserId, User] with m.SynchronizedMap[UserId, User]
-    }
-
-    def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
-      // TODO: flesh out validation
-      M.pure {
-        users.values.find(_.email == email) match {
-          case None =>
-            val userV = User(email, firstName, lastName, pass)
-            userV.foreach { user =>
-              users += (user.id -> user)
-            }
-            userV
-          case Some(_) =>
-            List("User already exists").failure
-        }
-      }
-    }
-
-    def login(email: Email,
-              password: PlainText): M[Validated[UserToken]] = ???
-
-  }
-
-}
+//trait InMemoryUsersModule[M[+_]] extends UsersModule[M] {
+//
+//  val users = new Impl()
+//
+//  class Impl extends UserService {
+//
+//    private[this] val users: m.Map[UserId, User] = {
+//      new m.HashMap[UserId, User] with m.SynchronizedMap[UserId, User]
+//    }
+//
+//    def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
+//      // TODO: flesh out validation
+//      M.pure {
+//        users.values.find(_.email == email) match {
+//          case None =>
+//            val userV = User(email, firstName, lastName, pass)
+//            userV.foreach { user =>
+//              users += (user.id -> user)
+//            }
+//            userV
+//          case Some(_) =>
+//            List("User already exists").failure
+//        }
+//      }
+//    }
+//
+//    def login(email: Email,
+//              password: PlainText): M[Validated[UserToken]] = ???
+//
+//  }
+//
+//}
 
