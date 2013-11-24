@@ -36,10 +36,10 @@ object Freeclimbers extends Build {
                             resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
 
                             libraryDependencies ++= Seq(
-                              "io.spray"                   % "spray-can"                     % "1.2-RC4",
-                              "io.spray"                   % "spray-routing"                 % "1.2-RC4",
+                              "io.spray"                   % "spray-can"                     % "1.2-RC3-akka2.3",
+                              "io.spray"                   % "spray-routing"                 % "1.2-RC3-akka2.3",
                               "io.spray"                  %% "spray-json"                    % "1.2.3",
-                              "io.spray"                   % "spray-testkit"                 % "1.2-RC4"      % "test"
+                              "io.spray"                   % "spray-testkit"                 % "1.2-RC3-akka2.3"      % "test"
 
                             )
                           )

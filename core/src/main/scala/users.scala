@@ -10,6 +10,7 @@ import org.mindrot.jbcrypt.BCrypt
 
 import scalaz._
 import Scalaz._
+import scalaz.contrib.std.scalaFuture
 
 case class UserId(uuid: UUID) extends AnyVal
 object UserId {
@@ -125,6 +126,7 @@ trait ActorUsersModule extends UsersModule[Future] {
   import akka.util.Timeout
   import scala.concurrent.duration._
 
+  implicit def M = scalaFuture.futureInstance
   val users = new Impl()
 
   class Impl extends UserService {
