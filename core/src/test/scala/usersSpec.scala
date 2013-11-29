@@ -155,8 +155,7 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
       val module = new ActorUsersModule with ActorSystemModule {
-        lazy val actorSystem = system
-        lazy val M = Monad[Future]
+        override lazy val actorSystem = system
       }
       f(module)
     } finally {
