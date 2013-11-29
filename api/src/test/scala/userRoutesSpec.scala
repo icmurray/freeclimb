@@ -7,8 +7,11 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest._
 import org.scalatest.matchers.ShouldMatchers
 
+import spray.json._
+import spray.httpx.SprayJsonSupport._
 import spray.http._
 import spray.httpx.marshalling.Marshaller
+import spray.httpx.unmarshalling.Unmarshaller
 import ContentTypes._
 import spray.testkit.ScalatestRouteTest
 
@@ -46,6 +49,10 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.Created)
+        val user = responseAs[JsObject]
+        user.fields("email") should equal (JsString(email.s))
+        user.fields.get("id") should not equal (None)
+        user.fields.get("password") should equal (None)
       }
     }
   }
@@ -77,4 +84,9 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
     f(module)
   }
 
+  implicit private val JsonUnmarshaller: Unmarshaller[JsObject] = {
+    Unmarshaller.delegate[String, JsObject](MediaTypes.`application/json`) { string =>
+      string.asJson.asJsObject
+    }
+  }
 }
