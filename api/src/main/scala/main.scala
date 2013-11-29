@@ -1,5 +1,8 @@
 package org.freeclimbers.api
 
+import scala.concurrent.Future
+import scala.language.higherKinds
+
 import akka.actor.{Actor, ActorSystem, Props, ActorRef}
 import akka.io.IO
 
@@ -19,8 +22,8 @@ object Api {
   }
 }
 
-trait HttpServiceActorModule {
-  this: ActorSystemModule with AllRoutes =>
+trait HttpServiceActorModule[M[+_]] {
+  this: ActorSystemModule with AllRoutes[M] =>
 
   val serviceActor = actorSystem.actorOf(
     Props(new ServiceActor()), "api-service")
@@ -31,14 +34,6 @@ trait HttpServiceActorModule {
   }
 }
 
-object ProductionService extends HttpServiceActorModule
-                            with AllRoutes
-                            with ProductionServices {
-
-}
-
-trait ServiceActorModule {
-  this: ActorSystemModule with UserRoutes =>
-
-  val serviceActor: ActorRef
-}
+object ProductionService extends HttpServiceActorModule[Future]
+                            with ProductionRoutes
+                            with ProductionServices

@@ -7,7 +7,11 @@ object Freeclimbers extends Build {
     scalaVersion in ThisBuild := "2.10.3",
     organization in ThisBuild := "org.freeclimbers",
     javaOptions in ThisBuild  ++= Seq("-Xmx2G"),
-    scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature")
+    scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature"),
+    libraryDependencies in ThisBuild ++= Seq(
+      "org.scalatest"     %% "scalatest"                   % "1.9.2"        % "test",
+      "org.scalamock"     %% "scalamock-scalatest-support" % "3.0.1"        % "test"
+    )
   )
 
   lazy val root = Project(id        = "freeclimbers",
@@ -23,8 +27,7 @@ object Freeclimbers extends Build {
                               "org.mindrot"        % "jbcrypt"                               % "0.3m",
                               "com.typesafe.akka" %% "akka-actor"                            % "2.3-M1",
                               "com.typesafe.akka" %% "akka-persistence-experimental"         % "2.3-M1",
-                              "com.typesafe.akka" %% "akka-testkit"                          % "2.3-M1"       % "test",
-                              "org.scalatest"     %% "scalatest"                             % "1.9.2"        % "test"
+                              "com.typesafe.akka" %% "akka-testkit"                          % "2.3-M1"       % "test"
                             )
                           ))
 
