@@ -10,7 +10,7 @@ import org.scalatest.matchers.ShouldMatchers
 import spray.json._
 import spray.httpx.SprayJsonSupport._
 import spray.http._
-import spray.httpx.marshalling.Marshaller
+import spray.httpx.marshalling.{Marshaller, ToResponseMarshaller}
 import spray.httpx.unmarshalling.Unmarshaller
 import ContentTypes._
 import spray.testkit.ScalatestRouteTest
@@ -57,6 +57,34 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
     }
   }
 
+  "/users" should "respond with conflict when user already exists" in {
+    withUsersEndpoint { module =>
+
+      val email = Email("test@example.com")
+      val firstName = "Test"
+      val lastName = "User"
+      val plaintext = PlainText("supersecret")
+
+      val json = JsonEntity(s"""
+        {
+          "email": "${email.s}",
+          "first_name": "${firstName}",
+          "last_name": "${lastName}",
+          "password": "${plaintext.s}"
+        }
+      """)
+
+      (module.users.register _)
+        .expects(email, firstName, lastName, plaintext)
+        .returning(List("User already exists").failure)
+
+      Post("/user", json) ~> module.userRoutes ~> check {
+        status should equal (StatusCodes.BadRequest)
+        responseAs[String] should include ("User already exists")
+      }
+    }
+  }
+
   /**
    * Creates a new User from the given details.
    *
@@ -79,6 +107,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
       override val users = mock[UserService]
       implicit def M = id
       implicit def MarshallerM[T](implicit m: Marshaller[T]) = m
+      implicit def ToResponseMarshallerM[T](implicit m: ToResponseMarshaller[T]) = m
     }
 
     f(module)
