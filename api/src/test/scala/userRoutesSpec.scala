@@ -103,11 +103,9 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
   private def withUsersEndpoint(f: UserRoutes[Id] with UsersModule[Id] => Unit) = {
 
-    val module = new UserRoutes[Id] with UsersModule[Id] {
+    val module = new UserRoutes[Id] with UsersModule[Id] with IdMarshalling {
       override val users = mock[UserService]
       implicit def M = id
-      implicit def MarshallerM[T](implicit m: Marshaller[T]) = m
-      implicit def ToResponseMarshallerM[T](implicit m: ToResponseMarshaller[T]) = m
     }
 
     f(module)

@@ -9,10 +9,9 @@ import Scalaz._
 
 import spray.json._
 import DefaultJsonProtocol._
-import spray.httpx.SprayJsonSupport
+import spray.httpx.SprayJsonSupport._
 
-import spray.http.{StatusCode, StatusCodes, ContentTypes}
-import spray.httpx.marshalling.{Marshaller, ToResponseMarshaller}
+import spray.http.StatusCodes
 import spray.routing.Directives
 
 import org.freeclimbers.core.{UsersModule, Email, PlainText, User}
@@ -47,13 +46,9 @@ object UserRegistered {
 }
 
 trait UserRoutes[M[+_]] extends Directives
+                           with RouteUtils
                            with MarshallingUtils {
-  this: UsersModule[M] =>
-
-  import spray.httpx.SprayJsonSupport._
-
-  implicit def MarshallerM[T](implicit m: Marshaller[T]): Marshaller[M[T]]
-  implicit def ToResponseMarshallerM[T](implicit m: ToResponseMarshaller[T]): ToResponseMarshaller[M[T]]
+  this: UsersModule[M] with HigherKindedMarshalling[M] =>
 
   lazy val userRoutes = {
     path("user") {
@@ -72,15 +67,5 @@ trait UserRoutes[M[+_]] extends Directives
       }
     }
   }
-
-  private def mapSuccessStatusTo(status: StatusCode) = {
-    mapHttpResponse { response =>
-      response.status.isSuccess match {
-        case true  => response.copy(status=status)
-        case false => response
-      }
-    }
-  }
-
 }
 
