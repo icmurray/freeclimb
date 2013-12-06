@@ -16,33 +16,6 @@ import spray.httpx.marshalling.{Marshaller, ToResponseMarshaller}
 import spray.routing.Directives
 
 import org.freeclimbers.core.{UsersModule, Email, PlainText, User}
-import org.freeclimbers.core.{Validated, DomainError}
-
-trait UtilMarshallers {
-
-  implicit val domainErrorJson = new RootJsonWriter[DomainError] {
-    def write(e: DomainError) = JsObject(
-      "errors" -> JsArray(e.map(msg => JsString(msg)))
-    )
-  }
-
-  implicit def validationResponseMarshaller[T](implicit mT: ToResponseMarshaller[T])
-                 : ToResponseMarshaller[Validated[T]] = {
-
-    ToResponseMarshaller.of[Validated[T]](ContentTypes.`application/json`) {
-        (value, contentType, ctx) =>
-      value match {
-        case Success(t) => mT(t, ctx)
-        case Failure(e) =>
-          implicit val deMarshaller = SprayJsonSupport.sprayJsonMarshaller[DomainError](domainErrorJson)
-          val domainErrorResponseMarshaller = ToResponseMarshaller.fromMarshaller(
-            status=StatusCodes.BadRequest)(deMarshaller)
-          domainErrorResponseMarshaller(e, ctx)
-      }
-    }
-  }
-
-}
 
 case class UserRegistration(
     email: String,
@@ -74,7 +47,7 @@ object UserRegistered {
 }
 
 trait UserRoutes[M[+_]] extends Directives
-                           with UtilMarshallers {
+                           with MarshallingUtils {
   this: UsersModule[M] =>
 
   import spray.httpx.SprayJsonSupport._

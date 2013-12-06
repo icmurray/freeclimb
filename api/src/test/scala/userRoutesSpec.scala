@@ -45,7 +45,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(newUser(email, firstName, lastName, plaintext).success)
+        .returning(newUser(email, firstName, lastName, plaintext))
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.Created)
@@ -94,9 +94,9 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
   private def newUser(email: Email,
                       firstName: String,
                       lastName: String,
-                      password: PlainText): User = {
+                      password: PlainText) = {
     User(UserId.createRandom(), email,
-         firstName, lastName, Digest(password.s))
+         firstName, lastName, Digest(password.s)).success
   }
 
   private def JsonEntity(s: String) = HttpEntity(`application/json`, s)
