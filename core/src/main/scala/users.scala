@@ -232,14 +232,15 @@ trait ActorUsersModule extends UsersModule[Future] {
 
     private[this] def handleLogout(cmd: LogoutCmd) = {
       usersImage.tokens.get(cmd.token) match {
-        case None       => sender ! {}
-        case Some(user) => {
+        case None                                  => sender ! {}
+        case Some(user) if user.email == cmd.email => {
           val event = UserLoggedOut(user.id, cmd.token)
           persist(event) { e =>
             updateState(e)
             sender ! {}
           }
         }
+        case _                                     => sender ! {}
       }
     }
 

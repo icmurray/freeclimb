@@ -57,7 +57,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
     }
   }
 
-  "/users" should "respond with conflict when user already exists" in {
+  "/users" should "respond with bad request when user already exists" in {
     withUsersEndpoint { module =>
 
       val email = Email("test@example.com")
@@ -81,6 +81,36 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.BadRequest)
         responseAs[String] should include ("User already exists")
+      }
+    }
+  }
+
+  "/users" should "respond with bad request when validation fails" in {
+    withUsersEndpoint { module =>
+
+      val email = Email("test@example.com")
+      val firstName = ""              // invalid
+      val lastName = "User"
+      val plaintext = PlainText("")   // invalid
+
+      val json = JsonEntity(s"""
+        {
+          "email": "${email.s}",
+          "first_name": "${firstName}",
+          "last_name": "${lastName}",
+          "password": "${plaintext.s}"
+        }
+      """)
+
+      (module.users.register _)
+        .expects(email, firstName, lastName, plaintext)
+        .returning(List("first_name cannot be empty",
+                        "password cannot be empty").failure)
+
+      Post("/user", json) ~> module.userRoutes ~> check {
+        status should equal (StatusCodes.BadRequest)
+        responseAs[String] should include ("first_name cannot be empty")
+        responseAs[String] should include ("password cannot be empty")
       }
     }
   }
