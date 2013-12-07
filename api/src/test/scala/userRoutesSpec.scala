@@ -1,6 +1,6 @@
 package org.freeclimbers.api
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, future}
 
 import org.scalamock.scalatest.MockFactory
 
@@ -13,13 +13,14 @@ import spray.http._
 import spray.httpx.marshalling.{Marshaller, ToResponseMarshaller}
 import spray.httpx.unmarshalling.Unmarshaller
 import ContentTypes._
+import spray.routing.HttpService
 import spray.testkit.ScalatestRouteTest
 
 import scalaz._
 import Scalaz._
 
 import org.freeclimbers.core.UsersModule
-import org.freeclimbers.core.{Email, PlainText, Digest, User, UserId}
+import org.freeclimbers.core.{Email, PlainText, Digest, User, UserId, UserToken}
 
 class UserRoutesSpec extends FlatSpec with ShouldMatchers
                                       with ScalatestRouteTest
@@ -45,7 +46,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(newUser(email, firstName, lastName, plaintext))
+        .returning(newUser(email, firstName, lastName, plaintext).success)
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.Created)
@@ -115,6 +116,61 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
     }
   }
 
+  "POST to /sessions" should "create a new user session" in {
+    withUsersEndpoint { module =>
+
+      val userToken = UserToken.generate()
+      val email = Email("test@example.com")
+      val plaintext = PlainText("password")
+
+      (module.users.login(_: Email, _: PlainText))
+        .expects(email, plaintext)
+        .returning(Some(userToken))
+
+      val credentials = BasicHttpCredentials("test@example.com", "password")
+
+      Post("/sessions") ~> 
+        addCredentials(credentials) ~>
+        module.userRoutes ~>
+        check {
+          status should equal (StatusCodes.Created)
+          responseAs[String] should include (userToken.uuid.toString)
+        }
+    }
+  }
+
+  "POST to /sessions" should "fail if no auth credentials provided" in {
+    withUsersEndpoint { module =>
+      Post("/sessions") ~> 
+        module.userRoutes ~>
+        check {
+          status should equal (StatusCodes.Unauthorized)
+        }
+    }
+  }
+
+  "POST to /sessions" should "fail if incorrect credentials are provided" in {
+    withUsersEndpoint { module =>
+
+      val userToken = UserToken.generate()
+      val email = Email("test@example.com")
+      val plaintext = PlainText("password")
+
+      (module.users.login(_: Email, _: PlainText))
+        .expects(email, plaintext)
+        .returning(None)
+
+      val credentials = BasicHttpCredentials("test@example.com", "password")
+
+      Post("/sessions") ~> 
+        addCredentials(credentials) ~>
+        module.userRoutes ~>
+        check {
+          status should equal (StatusCodes.Unauthorized)
+        }
+    }
+  }
+
   /**
    * Creates a new User from the given details.
    *
@@ -126,16 +182,19 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
                       lastName: String,
                       password: PlainText) = {
     User(UserId.createRandom(), email,
-         firstName, lastName, Digest(password.s)).success
+         firstName, lastName, Digest(password.s))
   }
 
   private def JsonEntity(s: String) = HttpEntity(`application/json`, s)
 
   private def withUsersEndpoint(f: UserRoutes[Id] with UsersModule[Id] => Unit) = {
 
-    val module = new UserRoutes[Id] with UsersModule[Id] with IdMarshalling {
+    val module = new UserRoutes[Id] with UsersModule[Id] with IdMarshalling with HttpService {
+      def actorRefFactory = system
+      override def userRoutes = sealRoute(super.userRoutes)
       override val users = mock[UserService]
       implicit def M = id
+      def readM[T](t: T) = future { t }
     }
 
     f(module)

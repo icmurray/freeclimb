@@ -22,4 +22,6 @@ trait ProductionRoutes extends AllRoutes[Future]
                           with FutureMarshalling {
   this: UsersModule[Future] =>
 
+  def readM[T](t: Future[T]) = t
+
 }
