@@ -109,10 +109,10 @@ trait UsersModule[M[+_]] {
     def login(email: Email,
               password: PlainText): M[Option[UserToken]]
 
-    def logout(email: Email, token: UserToken): M[Unit]
+    def logout(token: UserToken): M[Unit]
 
     def authenticate(email: Email, password: PlainText): M[Option[User]]
-    def authenticate(email: Email, token: UserToken): M[Option[User]]
+    def authenticate(token: UserToken): M[Option[User]]
   }
 
 }
@@ -146,16 +146,16 @@ trait ActorUsersModule extends UsersModule[Future] {
       (processor ? LoginCmd(email, password)).mapTo[Option[UserToken]]
     }
 
-    def logout(email: Email, token: UserToken): Future[Unit] = {
-      (processor ? LogoutCmd(email, token)).mapTo[Unit]
+    def logout(token: UserToken): Future[Unit] = {
+      (processor ? LogoutCmd(token)).mapTo[Unit]
     }
 
     def authenticate(email: Email, password: PlainText): Future[Option[User]] = {
       (processor ? PasswordAuth(email, password)).mapTo[Option[User]]
     }
 
-    def authenticate(email: Email, token: UserToken): Future[Option[User]] = {
-      (processor ? TokenAuth(email, token)).mapTo[Option[User]]
+    def authenticate(token: UserToken): Future[Option[User]] = {
+      (processor ? TokenAuth(token)).mapTo[Option[User]]
     }
   }
 
@@ -172,9 +172,9 @@ trait ActorUsersModule extends UsersModule[Future] {
   }
 
   private case class PasswordAuth(email: Email, pass: PlainText) extends Cmd
-  private case class TokenAuth(email: Email, token: UserToken) extends Cmd
+  private case class TokenAuth(token: UserToken) extends Cmd
   private case class LoginCmd(email: Email, pass: PlainText) extends Cmd
-  private case class LogoutCmd(email: Email, token: UserToken) extends Cmd
+  private case class LogoutCmd(token: UserToken) extends Cmd
 
   private class Processor extends EventsourcedProcessor {
 
@@ -232,15 +232,14 @@ trait ActorUsersModule extends UsersModule[Future] {
 
     private[this] def handleLogout(cmd: LogoutCmd) = {
       usersImage.tokens.get(cmd.token) match {
-        case None                                  => sender ! {}
-        case Some(user) if user.email == cmd.email => {
+        case None       => sender ! {}
+        case Some(user) => {
           val event = UserLoggedOut(user.id, cmd.token)
           persist(event) { e =>
             updateState(e)
             sender ! {}
           }
         }
-        case _                                     => sender ! {}
       }
     }
 
@@ -251,11 +250,8 @@ trait ActorUsersModule extends UsersModule[Future] {
       } yield user
     }
 
-    private[this] def authenticate(email: Email, token: UserToken) = {
-      for {
-        user <- usersImage.tokens.get(token)
-        if user.email == email
-      } yield user
+    private[this] def authenticate(token: UserToken) = {
+      usersImage.tokens.get(token)
     }
 
     private[this] def handlePasswordAuth(cmd: PasswordAuth) = {
@@ -263,7 +259,7 @@ trait ActorUsersModule extends UsersModule[Future] {
     }
 
     private[this] def handleTokenAuth(cmd: TokenAuth) = {
-      sender ! authenticate(cmd.email, cmd.token)
+      sender ! authenticate(cmd.token)
     }
 
     private[this] def handleRegister(cmd: RegisterCmd) = {

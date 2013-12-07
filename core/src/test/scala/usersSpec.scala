@@ -107,81 +107,20 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
       }
 
       val auth = blockFor {
-        module.users.authenticate(Email("test@example.com"), token)
+        module.users.authenticate(token)
       }
 
       auth should not equal (None)
       auth.get.email should equal (Email("test@example.com"))
 
       blockFor {
-        module.users.logout(Email("test@example.com"), token)
+        module.users.logout(token)
       }
 
       val authAgain = blockFor {
-        module.users.authenticate(Email("test@example.com"), token)
+        module.users.authenticate(token)
       }
       authAgain should equal (None)
-    }
-  }
-
-  "A UserService" should "not allow users to log in with other user's tokens" in {
-    withUsersModule { module =>
-      implicit val ec = module.ec
-
-      val token = blockFor {
-        for {
-          userV <- module.users.register(
-            Email("test@example.com"), "Test", "User", PlainText("pass")
-          )
-          user = userV.getOrElse(throw new RuntimeException())
-
-          tokenO <- module.users.login(user.email, PlainText("pass"))
-        } yield tokenO.get
-      }
-
-      val auth = blockFor {
-        module.users.authenticate(Email("not-test@example.com"), token)
-      }
-
-      auth should equal (None)
-    }
-  }
-
-  "A UserService" should "not allow users to log another user out" in {
-    withUsersModule { module =>
-      implicit val ec = module.ec
-
-      val token = blockFor {
-        for {
-          userV <- module.users.register(
-            Email("test@example.com"), "Test", "User", PlainText("pass")
-          )
-          user = userV.getOrElse(throw new RuntimeException())
-
-          tokenO <- module.users.login(user.email, PlainText("pass"))
-        } yield tokenO.get
-      }
-
-      val auth = blockFor {
-        module.users.authenticate(Email("test@example.com"), token)
-      }
-
-      auth should not equal (None)
-
-      blockFor {
-        // Right token, wrong email address.
-        module.users.logout(Email("not-test@example.com"), token)
-        
-        // Right email, wrong token
-        module.users.logout(Email("test@example.com"), UserToken.generate())
-      }
-
-      val authAgain = blockFor {
-        module.users.authenticate(Email("test@example.com"), token)
-      }
-
-      authAgain should not equal (None)
-
     }
   }
 
