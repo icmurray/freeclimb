@@ -171,6 +171,30 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
     }
   }
 
+  "DELETE to /sessions/<uuid>" should "delete the given session" in {
+    withUsersEndpoint { module =>
+
+      val userToken = UserToken.generate()
+
+      // Not needed ... knowledge of the token is sufficient.
+      //(module.users.authenticate(_: UserToken))
+      //  .expects(userToken)
+      //  .returning(Some(newUser(email, "A Test", "User", plaintext)))
+
+      (module.users.logout _)
+        .expects(userToken)
+
+      //val credentials = GenericHttpCredentials("Token", userToken.uuid.toString)
+
+      Delete("/sessions/" + userToken.uuid.toString) ~> 
+        //addCredentials(credentials) ~>
+        module.userRoutes ~>
+        check {
+          status should equal (StatusCodes.OK)
+        }
+    }
+  }
+
   /**
    * Creates a new User from the given details.
    *

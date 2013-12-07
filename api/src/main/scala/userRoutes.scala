@@ -88,7 +88,8 @@ trait UserRoutes[M[+_]] extends Directives
     } ~ path("sessions" / JavaUUID) { sessionId =>
       delete {
         complete {
-          "TODO"
+          val token = UserToken(sessionId)
+          users.logout(token).map(_ => "")
         }
       }
     }

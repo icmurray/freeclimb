@@ -124,6 +124,23 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
+  "A UserService" should "logout without failure if the session does not exist" in {
+    withUsersModule { module =>
+      implicit val ec = module.ec
+
+      val token = UserToken.generate()
+
+      blockFor {
+        module.users.logout(token)
+      }
+
+      val authAgain = blockFor {
+        module.users.authenticate(token)
+      }
+      authAgain should equal (None)
+    }
+  }
+
   private def blockFor[T](f: => Future[T]): T = {
     Await.result(f, 2.seconds)
   }
