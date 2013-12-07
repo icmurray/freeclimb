@@ -9,7 +9,7 @@ import org.freeclimbers.core.UsersModule
  * Convenience trait that brings togeher all the route traits.
  */
 trait AllRoutes[M[+_]] extends UserRoutes[M] {
-  this: UsersModule[M] with HigherKindedMarshalling[M] =>
+  this: UsersModule[M] with HigherKindedUtils[M] =>
 
   lazy val routes = userRoutes
 
@@ -19,9 +19,6 @@ trait AllRoutes[M[+_]] extends UserRoutes[M] {
  * Production-ready routes are all Future-based.
  */
 trait ProductionRoutes extends AllRoutes[Future]
-                          with FutureMarshalling {
+                          with FutureUtils {
   this: UsersModule[Future] =>
-
-  def readM[T](t: Future[T]) = t
-
 }

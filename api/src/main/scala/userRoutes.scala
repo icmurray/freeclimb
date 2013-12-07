@@ -2,7 +2,7 @@ package org.freeclimbers.api
 
 import java.util.UUID
 
-import scala.concurrent.{Future, future}
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.higherKinds
 
@@ -51,7 +51,7 @@ object UserRegistered {
 trait UserRoutes[M[+_]] extends Directives
                            with RouteUtils
                            with MarshallingUtils {
-  this: UsersModule[M] with HigherKindedMarshalling[M] =>
+  this: UsersModule[M] with HigherKindedUtils[M] =>
 
   implicit private val uuidJsonFormat = new JsonFormat[UUID] {
     def read(json: JsValue) = ???
@@ -61,8 +61,6 @@ trait UserRoutes[M[+_]] extends Directives
   }
 
   implicit private val userTokenJsonFormat = jsonFormat(UserToken.apply _, "id")
-
-  def readM[T](t: M[T]): Future[T]
 
   def userRoutes = {
     path("user") {

@@ -189,12 +189,11 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
   private def withUsersEndpoint(f: UserRoutes[Id] with UsersModule[Id] => Unit) = {
 
-    val module = new UserRoutes[Id] with UsersModule[Id] with IdMarshalling with HttpService {
+    val module = new UserRoutes[Id] with UsersModule[Id] with IdUtils with HttpService {
       def actorRefFactory = system
       override def userRoutes = sealRoute(super.userRoutes)
       override val users = mock[UserService]
       implicit def M = id
-      def readM[T](t: T) = future { t }
     }
 
     f(module)
