@@ -2,8 +2,9 @@ package org.freeclimbers.api
 
 import java.util.UUID
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, ExecutionContext, future}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
 import scala.language.higherKinds
 
 import scalaz._
@@ -13,9 +14,10 @@ import spray.json._
 import DefaultJsonProtocol._
 import spray.httpx.SprayJsonSupport._
 
-import spray.http.StatusCodes
-import spray.routing.Directives
+import spray.http.{StatusCodes, HttpRequest, HttpCredentials, HttpHeader, GenericHttpCredentials}
+import spray.routing.{Directives, RequestContext}
 import spray.routing.authentication.{BasicAuth, UserPass}
+import spray.routing.authentication.{HttpAuthenticator}
 
 import org.freeclimbers.core.{UsersModule, Email, PlainText, User, UserToken}
 
@@ -114,5 +116,33 @@ trait UserRoutes[M[+_]] extends Directives
 
     authenticate(BasicAuth(auth _, realm="secure"))
   }
+
+  //private def tokenAuth = {
+  //  authenticate(new TokenHttpAuthenticator())
+  //}
+
+  //class TokenHttpAuthenticator(implicit val executionContext: ExecutionContext)
+  //    extends HttpAuthenticator[(User, UserToken)] {
+
+  //  def authenticate(credentials: Option[HttpCredentials], ctx: RequestContext): Future[Option[(User, UserToken)]] = {
+
+  //    val resultM: M[Option[(User,UserToken)]] = credentials match {
+  //      case Some(GenericHttpCredentials("Token", tokenString, _)) =>
+  //        readUUID(tokenString) match {
+  //          case None       => M.pure(None)
+  //          case Some(uuid) => users.authenticate(UserToken(uuid)).map(_.map((_, UserToken(uuid))))
+  //        }
+  //      case _ => M.pure(None)
+  //    }
+  //    readM(resultM)
+  //  }
+
+  //  def getChallengeHeaders(httpRequest: HttpRequest): List[HttpHeader] = Nil
+
+  //  private def readUUID(s: String): Option[UUID] = {
+  //    Try { UUID.fromString(s) }.toOption
+  //  }
+
+  //}
 }
 
