@@ -45,6 +45,6 @@ object Freeclimbers extends Build {
                               "io.spray"                   % "spray-testkit"                 % "1.2-RC3-akka2.3"      % "test"
 
                             )
-                          )
+                          ) ++ sbtassembly.Plugin.assemblySettings
                   ) dependsOn(core)
 }
