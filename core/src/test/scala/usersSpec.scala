@@ -14,6 +14,7 @@ import org.scalatest.matchers.ShouldMatchers
 import scalaz._
 import scalaz.Id._
 import scalaz.contrib.std.scalaFuture._
+import scalaz.contrib.std.scalaFuture
 
 import com.typesafe.config.ConfigFactory
 
@@ -149,6 +150,7 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
       val module = new ActorUsersModule with ActorSystemModule {
+        implicit def M = scalaFuture.futureInstance
         override lazy val actorSystem = system
       }
       f(module)

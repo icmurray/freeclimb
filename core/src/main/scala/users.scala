@@ -126,7 +126,7 @@ trait ActorUsersModule extends UsersModule[Future] {
   import akka.util.Timeout
   import scala.concurrent.duration._
 
-  implicit def M = scalaFuture.futureInstance
+  //implicit def M = scalaFuture.futureInstance
   val users = new Impl()
 
   class Impl extends UserService {

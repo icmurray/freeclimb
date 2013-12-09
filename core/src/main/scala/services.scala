@@ -5,4 +5,7 @@ import scala.concurrent.Future
 import scalaz.contrib.std.scalaFuture
 
 trait ProductionServices extends ActorUsersModule
-                            with CoreActorSystemModule
+                            with ActorClimbsModule
+                            with CoreActorSystemModule {
+  implicit def M = scalaFuture.futureInstance
+}
