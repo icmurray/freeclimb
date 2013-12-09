@@ -17,7 +17,7 @@ object Api {
 
     val service = ProductionService.serviceActor
     implicit val system: ActorSystem = ProductionService.actorSystem
-    IO(Http) ! Http.Bind(service, "localhost", port = 8080)
+    IO(Http) ! Http.Bind(service, "localhost", port = 8090)
 
   }
 }
