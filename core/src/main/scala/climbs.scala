@@ -58,7 +58,6 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
   import akka.util.Timeout
   import scala.concurrent.duration._
 
-  //implicit def M = scalaFuture.futureInstance
   val climbs = new Impl()
 
   class Impl extends ClimbService[Future] {
@@ -66,7 +65,7 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
 
     // TODO: how should these actors fail together?
     private[this] val queryState = {
-      actorSystem.actorOf(Props(new QueryStateActor()), name = "climb-query-state")
+      actorSystem.actorOf(Props(new ReadModel()), name = "climb-read-model")
     }
 
     private[this] val singleWriter = {
@@ -116,23 +115,33 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
   private case class ClimbWithQ(id: ClimbId) extends ClimbQ
   private case class ResolvesToQ(id: ClimbId) extends ClimbQ
 
-  private class QueryStateActor extends Actor {
+  private class ReadModel extends EventsourcedProcessor {
 
     private[this] var climbsImage = ClimbsImage()
 
-    def receive = {
+    override def processorId = "climb-service"
 
+    private[this] def updateState(e: ClimbEvent) = e match {
+      case ClimbCreated(id, name) =>
+        climbsImage = climbsImage.addClimb((Climb(id, name)))
+
+      case ClimbDeDuplicated(kept, removed) =>
+        climbsImage = climbsImage.deDupeClimb(kept, removed)
+    }
+
+    val receiveReplay: Receive = {
+      case e: ClimbEvent => updateState(e)
+    }
+
+    val receiveCommand: Receive = {
       case ClimbWithQ(id) =>
         sender ! climbsImage.byId.get(id)
 
       case ResolvesToQ(id) =>
         sender ! resolve(id)
 
-      case ClimbCreated(id, name) =>
-        climbsImage = climbsImage.addClimb(Climb(id, name))
-
-      case ClimbDeDuplicated(kept, removed) =>
-        climbsImage = climbsImage.deDupeClimb(kept, removed)
+      case e: ClimbEvent =>
+        updateState(e)
     }
 
     private[this] def resolve(id: ClimbId): Option[Climb] = climbsImage.redirects.get(id)
@@ -159,21 +168,18 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
   private case class CreateCmd(name: String) extends Cmd
   private case class DeDupeCmd(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) extends Cmd
 
-  private class SingleWriter(queryStateRef: ActorRef) extends EventsourcedProcessor {
+  private class SingleWriter(queryState: ActorRef) extends EventsourcedProcessor {
+
+    override def processorId = "climb-service"
 
     private[this] def updateState(e: ClimbEvent) = e match {
-      case e: ClimbCreated =>
-      {}
-      case e: ClimbDeDuplicated =>
-      {}
+      case e: ClimbCreated => {}
+      case e: ClimbDeDuplicated => {}
     }
 
     val receiveReplay: Receive = {
       case evt: ClimbEvent =>
         updateState(evt)
-
-      //case SnapshotOffer(_, snapshot: ClimbsImage) =>
-      //  climbsImage = snapshot
     }
 
     val receiveCommand: Receive = {
@@ -188,7 +194,7 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       val event = ClimbCreated(id, cmd.name)
       persist(event) { e =>
         updateState(e)
-        queryStateRef ! e
+        queryState ! e
         sender ! id
       }
     }
@@ -197,7 +203,7 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       val event = ClimbDeDuplicated(cmd.toKeep, cmd.toRemove)
       persist(event) { e =>
         updateState(e)
-        queryStateRef ! e
+        queryState ! e
         sender ! cmd.toKeep.v
       }
     }
