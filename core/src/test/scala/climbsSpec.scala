@@ -62,6 +62,102 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
       resolved should equal (climb1.toOption)
     }
   }
+  
+  "A ClimbService" should "not follow redirect chains" in {
+    withClimbsModule { module =>
+      implicit val ec = module.ec
+      val (climb1, climb2, climb3) = blockFor {
+        for {
+          c1 <- module.climbs.create("Climb 1")
+          c2 <- module.climbs.create("Climb 2")
+          c3 <- module.climbs.create("Climb 3")
+        } yield (c1.toOption.get, c2.toOption.get, c3.toOption.get)
+      }
+
+      val (r1,r2) = blockFor {
+        for {
+          r1 <- module.climbs.deDuplicate(Keep(climb1.id), Remove(climb2.id))
+          r2 <- module.climbs.deDuplicate(Keep(climb2.id), Remove(climb3.id))
+        } yield (r1,r2)
+      }
+      r1.isSuccess should equal (true)
+      r2.isSuccess should equal (false)
+    }
+  }
+  
+  "A ClimbService" should "not allow redirecting to oneself" in {
+    withClimbsModule { module =>
+      implicit val ec = module.ec
+      val climb1 = blockFor {
+        for {
+          c1 <- module.climbs.create("Climb 1")
+        } yield c1.toOption.get
+      }
+
+      val result = blockFor {
+        module.climbs.deDuplicate(Keep(climb1.id), Remove(climb1.id))
+      }
+      result.isSuccess should equal (false)
+    }
+  }
+
+  "A ClimbService" should "re-establish existing redirects" in {
+    withClimbsModule { module =>
+      implicit val ec = module.ec
+      val (climb1, climb2, climb3, climb4) = blockFor {
+        for {
+          c1 <- module.climbs.create("Climb 1")
+          c2 <- module.climbs.create("Climb 2")
+          c3 <- module.climbs.create("Climb 3")
+          c4 <- module.climbs.create("Climb 4")
+        } yield (c1.toOption.get, c2.toOption.get, c3.toOption.get, c4.toOption.get)
+      }
+
+      val (r1,r2) = blockFor {
+        for {
+          r1 <- module.climbs.deDuplicate(Keep(climb1.id), Remove(climb3.id))
+          r2 <- module.climbs.deDuplicate(Keep(climb2.id), Remove(climb4.id))
+        } yield (r1,r2)
+      }
+      r1.isSuccess should equal (true)
+      r2.isSuccess should equal (true)
+
+      val r = blockFor {
+        module.climbs.deDuplicate(Keep(climb1.id), Remove(climb2.id))
+      }
+      r.isSuccess should equal (true)
+
+      val (id1, id2, id3, id4) = blockFor {
+        for {
+          c1 <- module.climbs.withId(climb1.id)
+          c2 <- module.climbs.withId(climb2.id)
+          c3 <- module.climbs.withId(climb3.id)
+          c4 <- module.climbs.withId(climb4.id)
+        } yield (c1.map(_.id), c2.map(_.id), c3.map(_.id), c4.map(_.id))
+      }
+      id1 should equal (Some(climb1.id))
+      id2 should equal (None)
+      id3 should equal (None)
+      id4 should equal (None)
+
+      val (ln2, ln3, ln4) = blockFor {
+        for {
+          ln2 <- module.climbs.resolvesTo(climb2.id)
+          ln3 <- module.climbs.resolvesTo(climb3.id)
+          ln4 <- module.climbs.resolvesTo(climb4.id)
+        } yield (ln2, ln3, ln4)
+      }
+
+      ln2 should equal (Some(climb1))
+      ln3 should equal (Some(climb1))
+      ln4 should equal (Some(climb1))
+
+    }
+  }
+
+  "A ClimbService" should "not be able to create circular redirect links" in {
+    (pending) // scalacheck?
+  }
 
   private def blockFor[T](f: => Future[T]): T = {
     Await.result(f, 2.seconds)

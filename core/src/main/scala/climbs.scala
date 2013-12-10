@@ -83,21 +83,25 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
     }
 
     def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Future[Validated[ClimbId]] = {
-      val keepF = withId(toKeep.v)
-      val removeF = withId(toRemove.v)
 
-      for {
-        keep <- keepF
-        remove <- removeF
+      if (toKeep.v == toRemove.v) {
+        future { List("Cant merge a climb with itself").failure }
+      } else {
+        val keepF = withId(toKeep.v)
+        val removeF = withId(toRemove.v)
 
-        result <- if (keep.nonEmpty && remove.nonEmpty) {
-          val cmd = DeDupeCmd(toKeep, toRemove)
-          (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
-        } else {
-          future { List("Couldn't find both climb ids").failure }
-        }
-      } yield result
+        for {
+          keep <- keepF
+          remove <- removeF
 
+          result <- if (keep.nonEmpty && remove.nonEmpty) {
+            val cmd = DeDupeCmd(toKeep, toRemove)
+            (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
+          } else {
+            future { List("Couldn't find both climb ids").failure }
+          }
+        } yield result
+      }
     }
 
     def withId(id: ClimbId): Future[Option[Climb]] = {
@@ -144,7 +148,14 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
         updateState(e)
     }
 
-    private[this] def resolve(id: ClimbId): Option[Climb] = climbsImage.redirects.get(id)
+    @annotation.tailrec
+    private[this] def resolve(id: ClimbId): Option[Climb] = {
+      climbsImage.redirects.get(id) match {
+        case None                            => None
+        case r@Some(climb) if climb.id == id => r
+        case Some(climb)                     => resolve(climb.id)
+      }
+    }
 
     private[this] case class ClimbsImage(
         byId: Map[ClimbId, Climb] = Map(),
