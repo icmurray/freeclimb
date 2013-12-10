@@ -4,7 +4,7 @@ package core
 import java.util.UUID
 
 import scala.language.higherKinds
-import scala.concurrent.Future
+import scala.concurrent.{Future, future}
 
 import scalaz._
 import Scalaz._
@@ -39,6 +39,7 @@ trait ClimbServiceWrites[M[+_]] {
 
 trait ClimbServiceReads[M[+_]] {
   def withId(id: ClimbId): M[Option[Climb]]
+  def resolvesTo(id: ClimbId): M[Option[Climb]]
   def like(name: String): M[Seq[Climb]]
 }
 
@@ -78,17 +79,42 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       val cmd = CreateCmd(name)
       for {
         id    <- (singleWriter ? cmd).mapTo[ClimbId]
-        climb <- (queryState ? ClimbWithQ(id)).mapTo[Some[Climb]]
+        climb <- (queryState ? ClimbWithQ(id)).mapTo[Option[Climb]]
       } yield climb.get.success
     }
 
-    def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Future[Validated[ClimbId]] = ???
-    def withId(id: ClimbId): Future[Option[Climb]] = (queryState ? ClimbWithQ(id)).mapTo[Some[Climb]]
+    def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Future[Validated[ClimbId]] = {
+      val keepF = withId(toKeep.v)
+      val removeF = withId(toRemove.v)
+
+      for {
+        keep <- keepF
+        remove <- removeF
+
+        result <- if (keep.nonEmpty && remove.nonEmpty) {
+          val cmd = DeDupeCmd(toKeep, toRemove)
+          (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
+        } else {
+          future { List("Couldn't find both climb ids").failure }
+        }
+      } yield result
+
+    }
+
+    def withId(id: ClimbId): Future[Option[Climb]] = {
+      (queryState ? ClimbWithQ(id)).mapTo[Option[Climb]]
+    }
+
+    def resolvesTo(id: ClimbId): Future[Option[Climb]] = {
+      (queryState ? ResolvesToQ(id)).mapTo[Option[Climb]]
+    }
+
     def like(name: String): Future[Seq[Climb]] = ???
   }
 
   private sealed trait ClimbQ
   private case class ClimbWithQ(id: ClimbId) extends ClimbQ
+  private case class ResolvesToQ(id: ClimbId) extends ClimbQ
 
   private class QueryStateActor extends Actor {
 
@@ -99,15 +125,32 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       case ClimbWithQ(id) =>
         sender ! climbsImage.byId.get(id)
 
+      case ResolvesToQ(id) =>
+        sender ! resolve(id)
+
       case ClimbCreated(id, name) =>
         climbsImage = climbsImage.addClimb(Climb(id, name))
+
+      case ClimbDeDuplicated(kept, removed) =>
+        climbsImage = climbsImage.deDupeClimb(kept, removed)
     }
 
+    private[this] def resolve(id: ClimbId): Option[Climb] = climbsImage.redirects.get(id)
+
     private[this] case class ClimbsImage(
-        byId: Map[ClimbId, Climb] = Map()) {
+        byId: Map[ClimbId, Climb] = Map(),
+        redirects: Map[ClimbId, Climb] = Map()) {
 
       def addClimb(climb: Climb) = ClimbsImage(
-        byId + (climb.id -> climb))
+        byId + (climb.id -> climb),
+        redirects + (climb.id -> climb))
+
+      def deDupeClimb(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
+        val keep = redirects(toKeep.v)
+        ClimbsImage(
+          byId - toRemove.v,
+          redirects + (toRemove.v -> keep))
+      }   
     }
 
   }
@@ -122,7 +165,7 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       case e: ClimbCreated =>
       {}
       case e: ClimbDeDuplicated =>
-        ???
+      {}
     }
 
     val receiveReplay: Receive = {
@@ -151,7 +194,12 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
     }
 
     private[this] def handleDeDuplication(cmd: DeDupeCmd) = {
-
+      val event = ClimbDeDuplicated(cmd.toKeep, cmd.toRemove)
+      persist(event) { e =>
+        updateState(e)
+        queryStateRef ! e
+        sender ! cmd.toKeep.v
+      }
     }
 
   }

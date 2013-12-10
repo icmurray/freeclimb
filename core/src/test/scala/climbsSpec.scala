@@ -37,6 +37,32 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
+  "A ClimbService" should "merge 2 climbs" in {
+    withClimbsModule { module =>
+      implicit val ec = module.ec
+      val (climb1, climb2) = blockFor {
+        for {
+          c1 <- module.climbs.create("Climb 1")
+          c2 <- module.climbs.create("Climb 2")
+        } yield (c1, c2)
+      }
+
+      blockFor {
+        module.climbs.deDuplicate(Keep(climb1.toOption.get.id), Remove(climb2.toOption.get.id))
+      }
+
+      val climb2Again = blockFor {
+        module.climbs.withId(climb2.toOption.get.id)
+      }
+      climb2Again should equal (None)
+
+      val resolved = blockFor {
+        module.climbs.resolvesTo(climb2.toOption.get.id)
+      }
+      resolved should equal (climb1.toOption)
+    }
+  }
+
   private def blockFor[T](f: => Future[T]): T = {
     Await.result(f, 2.seconds)
   }
