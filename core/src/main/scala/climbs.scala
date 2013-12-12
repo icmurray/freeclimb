@@ -37,11 +37,12 @@ trait ClimbsModule[M[+_]] {
 
   trait ClimbService {
 
-    // queries
-    def create(name: String): M[Validated[Climb]]
+    // commands
+    def create(name: String): M[Validated[ClimbId]]
     def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): M[Validated[ClimbId]]
 
-    // commands
+    // queries
+    // Note - query results are only *eventually* consistent with issued commands.
     def withId(id: ClimbId): M[Option[Climb]]
     def resolvesTo(id: ClimbId): M[Option[Climb]]
     def like(name: String): M[Seq[Climb]]
@@ -73,12 +74,11 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
 
     private[this] implicit val timeout = Timeout(5.seconds)
 
-    def create(name: String): Future[Validated[Climb]] = {
+    def create(name: String): Future[Validated[ClimbId]] = {
       val cmd = CreateCmd(name)
       for {
         id    <- (singleWriter ? cmd).mapTo[ClimbId]
-        climb <- (queryState ? ClimbWithQ(id)).mapTo[Option[Climb]]
-      } yield climb.get.success
+      } yield id.success
     }
 
     def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Future[Validated[ClimbId]] = {
@@ -143,8 +143,11 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       case ResolvesToQ(id) =>
         sender ! resolve(id)
 
-      case e: ClimbEvent =>
+      case p@Persistent(e: ClimbEvent,_) =>
         updateState(e)
+        p.confirm()
+
+      case e => println(s"Unhandled: ${e}")
     }
 
     @annotation.tailrec
@@ -182,9 +185,18 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
 
     override def processorId = "climb-service"
 
-    private[this] def updateState(e: ClimbEvent) = e match {
-      case e: ClimbCreated => {}
-      case e: ClimbDeDuplicated => {}
+    private val channel = context.actorOf(Channel.props(), name="climb-events-channel")
+
+    private[this] def updateState(e: ClimbEvent) = {
+      e match {
+        case e: ClimbCreated => {}
+        case e: ClimbDeDuplicated => {}
+      }
+      notify(e)
+    }
+
+    private[this] def notify(e: ClimbEvent): Unit = {
+      channel ! Deliver(Persistent.create(e), queryState)
     }
 
     val receiveReplay: Receive = {
@@ -204,7 +216,6 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       val event = ClimbCreated(id, cmd.name)
       persist(event) { e =>
         updateState(e)
-        queryState ! e
         sender ! id
       }
     }
@@ -213,7 +224,6 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
       val event = ClimbDeDuplicated(cmd.toKeep, cmd.toRemove)
       persist(event) { e =>
         updateState(e)
-        queryState ! e
         sender ! cmd.toKeep.v
       }
     }
