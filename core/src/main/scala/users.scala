@@ -6,11 +6,13 @@ import scala.collection.{mutable => m}
 import scala.concurrent.{Future, future}
 import scala.language.higherKinds
 
-import org.mindrot.jbcrypt.BCrypt
-
 import scalaz._
 import Scalaz._
 import scalaz.contrib.std.scalaFuture
+
+/*****************************************************************************
+ * Models
+ *****************************************************************************/
 
 case class UserId(uuid: UUID) extends AnyVal
 object UserId {
@@ -33,7 +35,16 @@ case class User(
     lastName: String,
     password: Digest)
 
+
+/*****************************************************************************
+ * Events
+ *****************************************************************************/
+
 sealed trait UserEvent
+
+case class UserLoggedIn(id: UserId, token: UserToken) extends UserEvent
+case class UserLoggedOut(id: UserId, token: UserToken) extends UserEvent
+
 case class UserRegistered(
     id: UserId,
     email: Email,
@@ -42,22 +53,6 @@ case class UserRegistered(
     password: Digest) extends UserEvent {
 
   def createUser = User(id, email, firstName, lastName, password)
-
-}
-
-case class UserLoggedIn(id: UserId, token: UserToken) extends UserEvent
-case class UserLoggedOut(id: UserId, token: UserToken) extends UserEvent
-
-object Password {
-
-  def hash(password: PlainText): Digest = {
-    Digest(BCrypt.hashpw(password.s, BCrypt.gensalt()))
-  }
-
-  def check(candidate: PlainText, digest: Digest): Boolean = {
-    BCrypt.checkpw(candidate.s, digest.s)
-  }
-
 }
 
 object UserRegistered {
@@ -94,6 +89,14 @@ object UserRegistered {
 
 }
 
+
+/*****************************************************************************
+ * Service Module
+ *****************************************************************************/
+
+/**
+ * User service interface API
+ */
 trait UsersModule[M[+_]] {
 
   implicit def M: Monad[M]
@@ -117,6 +120,9 @@ trait UsersModule[M[+_]] {
 
 }
 
+/**
+ * Eventsourced-based implementation of the user service.
+ */
 trait ActorUsersModule extends UsersModule[Future] {
   this: ActorSystemModule =>
 
@@ -131,11 +137,20 @@ trait ActorUsersModule extends UsersModule[Future] {
 
   class Impl extends UserService {
 
+    /*************************************************************************
+     * Constructor body
+     ************************************************************************/
+
     private[this] val processor = {
       actorSystem.actorOf(Props(new Processor()), name = "user-processor")
     }
 
     private[this] implicit val timeout = Timeout(5.seconds)
+
+
+    /*************************************************************************
+     * Service implementation
+     ************************************************************************/
 
     def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
       (processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]]
@@ -157,196 +172,168 @@ trait ActorUsersModule extends UsersModule[Future] {
     def authenticate(token: UserToken): Future[Option[User]] = {
       (processor ? TokenAuth(token)).mapTo[Option[User]]
     }
-  }
 
-  /**
-   * The commands that control the Processor
-   */
-  private sealed trait Cmd
-  private case class RegisterCmd(
-      email: Email,
-      firstName: String,
-      lastName: String,
-      pass: PlainText) extends Cmd {
-    def validate = UserRegistered(email, firstName, lastName, pass)
-  }
 
-  private case class PasswordAuth(email: Email, pass: PlainText) extends Cmd
-  private case class TokenAuth(token: UserToken) extends Cmd
-  private case class LoginCmd(email: Email, pass: PlainText) extends Cmd
-  private case class LogoutCmd(token: UserToken) extends Cmd
-
-  private class Processor extends EventsourcedProcessor {
-
-    private[this] var usersImage = UsersImage()
-
-    private[this] def updateState(e: UserEvent) = e match {
-      case e: UserRegistered =>
-        usersImage = usersImage.addUser(e.createUser)
-      case UserLoggedIn(id, token) =>
-        usersImage = usersImage.login(id, token)
-      case UserLoggedOut(id, token) =>
-        usersImage = usersImage.logout(id, token)
-    }
+    /***************************************************************************
+     * Private members
+     **************************************************************************/
 
     /**
-     * Handling *re-played* events.
+     * The commands that control the Processor
      */
-    val receiveReplay: Receive = {
-      case evt: UserEvent =>
-        updateState(evt)
-
-      case SnapshotOffer(_, snapshot: UsersImage) =>
-        usersImage = snapshot
+    private sealed trait Cmd
+    private case class RegisterCmd(
+        email: Email,
+        firstName: String,
+        lastName: String,
+        pass: PlainText) extends Cmd {
+      def validate = UserRegistered(email, firstName, lastName, pass)
     }
+
+    private case class PasswordAuth(email: Email, pass: PlainText) extends Cmd
+    private case class TokenAuth(token: UserToken) extends Cmd
+    private case class LoginCmd(email: Email, pass: PlainText) extends Cmd
+    private case class LogoutCmd(token: UserToken) extends Cmd
 
     /**
-     * Handling external commands.
+     * The processor itself.
      */
-    val receiveCommand: Receive = {
-      case cmd: RegisterCmd =>
-        handleRegister(cmd)
-      case cmd: PasswordAuth =>
-        handlePasswordAuth(cmd)
-      case cmd: LoginCmd =>
-        handleLogin(cmd)
-      case cmd: TokenAuth =>
-        handleTokenAuth(cmd)
-      case cmd: LogoutCmd =>
-        handleLogout(cmd)
-    }
+    private class Processor extends EventsourcedProcessor {
 
-    private[this] def handleLogin(cmd: LoginCmd) = {
-      authenticate(cmd.email, cmd.pass) match {
-        case None       => sender ! None
-        case Some(user) => {
-          val token = UserToken.generate()
-          val event = UserLoggedIn(user.id, token)
-          persist(event) { e =>
-            updateState(e)
-            sender ! Some(token)
+      private[this] var usersImage = UsersImage()
+
+      /**
+       * Handling *re-played* events.
+       */
+      val receiveReplay: Receive = {
+        case evt: UserEvent =>
+          updateState(evt)
+
+        case SnapshotOffer(_, snapshot: UsersImage) =>
+          usersImage = snapshot
+      }
+
+      /**
+       * Handling external commands.
+       */
+      val receiveCommand: Receive = {
+        case cmd: RegisterCmd =>
+          handleRegister(cmd)
+        case cmd: PasswordAuth =>
+          handlePasswordAuth(cmd)
+        case cmd: LoginCmd =>
+          handleLogin(cmd)
+        case cmd: TokenAuth =>
+          handleTokenAuth(cmd)
+        case cmd: LogoutCmd =>
+          handleLogout(cmd)
+      }
+
+      private[this] def updateState(e: UserEvent) = e match {
+        case e: UserRegistered =>
+          usersImage = usersImage.addUser(e.createUser)
+        case UserLoggedIn(id, token) =>
+          usersImage = usersImage.login(id, token)
+        case UserLoggedOut(id, token) =>
+          usersImage = usersImage.logout(id, token)
+      }
+
+      private[this] def handleLogin(cmd: LoginCmd) = {
+        authenticate(cmd.email, cmd.pass) match {
+          case None       => sender ! None
+          case Some(user) => {
+            val token = UserToken.generate()
+            val event = UserLoggedIn(user.id, token)
+            persist(event) { e =>
+              updateState(e)
+              sender ! Some(token)
+            }
           }
         }
       }
-    }
 
-    private[this] def handleLogout(cmd: LogoutCmd) = {
-      usersImage.tokens.get(cmd.token) match {
-        case None       => sender ! {}
-        case Some(user) => {
-          val event = UserLoggedOut(user.id, cmd.token)
-          persist(event) { e =>
-            updateState(e)
-            sender ! {}
+      private[this] def handleLogout(cmd: LogoutCmd) = {
+        usersImage.tokens.get(cmd.token) match {
+          case None       => sender ! {}
+          case Some(user) => {
+            val event = UserLoggedOut(user.id, cmd.token)
+            persist(event) { e =>
+              updateState(e)
+              sender ! {}
+            }
           }
         }
       }
-    }
 
-    private[this] def authenticate(email: Email, pass: PlainText) = {
-      for {
-        user <- usersImage.byEmail.get(email)
-        if Password.check(pass, user.password)
-      } yield user
-    }
+      private[this] def authenticate(email: Email, pass: PlainText) = {
+        for {
+          user <- usersImage.byEmail.get(email)
+          if Password.check(pass, user.password)
+        } yield user
+      }
 
-    private[this] def authenticate(token: UserToken) = {
-      usersImage.tokens.get(token)
-    }
+      private[this] def authenticate(token: UserToken) = {
+        usersImage.tokens.get(token)
+      }
 
-    private[this] def handlePasswordAuth(cmd: PasswordAuth) = {
-      sender ! authenticate(cmd.email, cmd.pass)
-    }
+      private[this] def handlePasswordAuth(cmd: PasswordAuth) = {
+        sender ! authenticate(cmd.email, cmd.pass)
+      }
 
-    private[this] def handleTokenAuth(cmd: TokenAuth) = {
-      sender ! authenticate(cmd.token)
-    }
+      private[this] def handleTokenAuth(cmd: TokenAuth) = {
+        sender ! authenticate(cmd.token)
+      }
 
-    private[this] def handleRegister(cmd: RegisterCmd) = {
-      val eventV = cmd.validate
-      eventV.fold(
-        invalid => sender ! eventV,
-        event   => {
-          val user = event.createUser
-          usersImage.byEmail.get(user.email) match {
-            case Some(_) =>
-              sender ! List("User already exists").failure
+      private[this] def handleRegister(cmd: RegisterCmd) = {
+        val eventV = cmd.validate
+        eventV.fold(
+          invalid => sender ! eventV,
+          event   => {
+            val user = event.createUser
+            usersImage.byEmail.get(user.email) match {
+              case Some(_) =>
+                sender ! List("User already exists").failure
 
-            case None =>
-              persist(event) { e =>
-                updateState(e)
-                sender ! user.success
-              }
+              case None =>
+                persist(event) { e =>
+                  updateState(e)
+                  sender ! user.success
+                }
+            }
           }
+        )
+      }
+
+      /**
+       * The class representing the projected state.
+       */
+      private case class UsersImage(
+          byId: Map[UserId, User] = Map(),
+          byEmail: Map[Email, User] = Map(),
+          tokens: Map[UserToken, User] = Map()) {
+
+        def addUser(user: User): UsersImage = {
+          UsersImage(
+            byId + (user.id -> user),
+            byEmail + (user.email -> user),
+            tokens)
         }
-      )
+
+        def login(id: UserId, token: UserToken): UsersImage = {
+          val user = byId(id)
+          UsersImage(
+            byId, byEmail,
+            tokens + (token -> user))
+        }
+
+        def logout(id: UserId, token: UserToken): UsersImage = {
+          val user = byId(id)
+          UsersImage(
+            byId, byEmail,
+            tokens - token)
+        }
+      }
     }
-
-    private case class UsersImage(
-        byId: Map[UserId, User] = Map(),
-        byEmail: Map[Email, User] = Map(),
-        tokens: Map[UserToken, User] = Map()) {
-
-      def addUser(user: User): UsersImage = {
-        UsersImage(
-          byId + (user.id -> user),
-          byEmail + (user.email -> user),
-          tokens)
-      }
-
-      def login(id: UserId, token: UserToken): UsersImage = {
-        val user = byId(id)
-        UsersImage(
-          byId, byEmail,
-          tokens + (token -> user))
-      }
-
-      def logout(id: UserId, token: UserToken): UsersImage = {
-        val user = byId(id)
-        UsersImage(
-          byId, byEmail,
-          tokens - token)
-      }
-
-    }
-
   }
-
 }
-
-/**
- * This is **FULL** of race conditions.
- */
-//trait InMemoryUsersModule[M[+_]] extends UsersModule[M] {
-//
-//  val users = new Impl()
-//
-//  class Impl extends UserService {
-//
-//    private[this] val users: m.Map[UserId, User] = {
-//      new m.HashMap[UserId, User] with m.SynchronizedMap[UserId, User]
-//    }
-//
-//    def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
-//      // TODO: flesh out validation
-//      M.pure {
-//        users.values.find(_.email == email) match {
-//          case None =>
-//            val userV = User(email, firstName, lastName, pass)
-//            userV.foreach { user =>
-//              users += (user.id -> user)
-//            }
-//            userV
-//          case Some(_) =>
-//            List("User already exists").failure
-//        }
-//      }
-//    }
-//
-//    def login(email: Email,
-//              password: PlainText): M[Validated[UserToken]] = ???
-//
-//  }
-//
-//}
 

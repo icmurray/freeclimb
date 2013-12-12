@@ -169,7 +169,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
   private def withClimbsModule(f: ClimbsModule[Future] with ActorSystemModule => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
-      val module = new ActorClimbsModule with ActorSystemModule {
+      val module = new EventsourcedClimbsModule with ActorSystemModule {
         implicit def M = scalaFuture.futureInstance
         override lazy val actorSystem = system
       }
