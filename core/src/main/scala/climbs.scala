@@ -109,24 +109,9 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
 
     def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Future[Validated[ClimbId]] = {
 
-      if (toKeep.v == toRemove.v) {
-        future { List("Cant merge a climb with itself").failure }
-      } else {
-        val keepF = withId(toKeep.v)
-        val removeF = withId(toRemove.v)
+      val cmd = DeDupeCmd(toKeep, toRemove)
+      (singleWriter ? cmd).mapTo[Validated[ClimbId]]
 
-        for {
-          keep <- keepF
-          remove <- removeF
-
-          result <- if (keep.nonEmpty && remove.nonEmpty) {
-            val cmd = DeDupeCmd(toKeep, toRemove)
-            (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
-          } else {
-            future { List("Couldn't find both climb ids").failure }
-          }
-        } yield result
-      }
     }
 
     def withId(id: ClimbId): Future[Option[Climb]] = {
@@ -258,6 +243,7 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
     private class SingleWriter extends EventsourcedProcessor {
 
       private val channel = context.actorOf(Channel.props(), name="climb-events-channel")
+      private var state = ClimbData()
 
       override def processorId = sharedProcessorId
 
@@ -286,8 +272,11 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
 
       private[this] def updateState(e: ClimbEvent) = {
         e match {
-          case e: ClimbCreated => {}
-          case e: ClimbDeDuplicated => {}
+          case e: ClimbCreated =>
+            state = state.addClimb(e.id)
+
+          case ClimbDeDuplicated(_, removed) =>
+            state = state.removeClimb(removed.v)
         }
         notify(e)
       }
@@ -306,11 +295,35 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
       }
 
       private[this] def handleDeDuplication(cmd: DeDupeCmd) = {
-        val event = ClimbDeDuplicated(cmd.toKeep, cmd.toRemove)
-        persist(event) { e =>
-          updateState(e)
-          sender ! cmd.toKeep.v
+
+        val toKeep = cmd.toKeep.v
+        val toRemove = cmd.toRemove.v
+
+        if (toKeep == toRemove) {
+          sender ! List("Cannot merge a climb with itself").failure
+        } else if (! state.concreteIds.contains(toKeep) ||
+                   ! state.concreteIds.contains(toRemove)) {
+          sender ! List("Could not find both climb ids").failure
+        } else {
+          val event = ClimbDeDuplicated(cmd.toKeep, cmd.toRemove)
+          persist(event) { e =>
+            updateState(e)
+            sender ! cmd.toKeep.v.success
+          }
         }
+      }
+
+
+      /*************************************************************************
+       * Private classes
+       *************************************************************************/
+
+      /**
+       * The state required to ensure data integrity.
+       */
+      private[this] case class ClimbData(concreteIds: Set[ClimbId] = Set()) {
+        def addClimb(id: ClimbId) = copy(concreteIds + id)
+        def removeClimb(id: ClimbId) = copy(concreteIds - id)
       }
     }
   }
