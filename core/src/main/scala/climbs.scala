@@ -30,23 +30,23 @@ case class ClimbDeDuplicated(
     kept: Keep[ClimbId],
     removed: Remove[ClimbId]) extends ClimbEvent
 
-trait ClimbService[M[+_]] extends ClimbServiceWrites[M] with ClimbServiceReads[M]
-
-trait ClimbServiceWrites[M[+_]] {
-  def create(name: String): M[Validated[Climb]]
-  def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): M[Validated[ClimbId]]
-}
-
-trait ClimbServiceReads[M[+_]] {
-  def withId(id: ClimbId): M[Option[Climb]]
-  def resolvesTo(id: ClimbId): M[Option[Climb]]
-  def like(name: String): M[Seq[Climb]]
-}
-
 trait ClimbsModule[M[+_]] {
   implicit def M: Monad[M]
 
-  val climbs: ClimbService[M]
+  val climbs: ClimbService
+
+  trait ClimbService {
+
+    // queries
+    def create(name: String): M[Validated[Climb]]
+    def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): M[Validated[ClimbId]]
+
+    // commands
+    def withId(id: ClimbId): M[Option[Climb]]
+    def resolvesTo(id: ClimbId): M[Option[Climb]]
+    def like(name: String): M[Seq[Climb]]
+  }
+
 }
 
 trait ActorClimbsModule extends ClimbsModule[Future] {
@@ -60,8 +60,7 @@ trait ActorClimbsModule extends ClimbsModule[Future] {
 
   val climbs = new Impl()
 
-  class Impl extends ClimbService[Future] {
-
+  class Impl extends ClimbService {
 
     // TODO: how should these actors fail together?
     private[this] val queryState = {
