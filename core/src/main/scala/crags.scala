@@ -102,7 +102,9 @@ trait EventsourcedCragsModule extends CragsModule[Future] {
       (readModel ? CragWithQ(id)).mapTo[Option[Crag]]
     }
 
-    def list(): Future[Seq[Crag]] = ???
+    def list(): Future[Seq[Crag]] = {
+      (readModel ? ListQ).mapTo[Seq[Crag]]
+    }
 
 
     /***************************************************************************
@@ -158,7 +160,7 @@ trait EventsourcedCragsModule extends CragsModule[Future] {
           sender ! cragsImage.byId.get(id)
 
         case ListQ =>
-          sender ! cragsImage.byId.values
+          sender ! cragsImage.byId.values.toSeq
 
         case p@Persistent(e: CragEvent,_) =>
           updateState(e)
