@@ -66,7 +66,7 @@ trait EventsourcedCragsModule extends CragsModule[Future] {
 
   class Impl extends CragService {
     def create(name: String) = ???
-    def withId(id: CragId) = future { Some(Crag(id, "<todo>", "")) }
+    def withId(id: CragId) = ???
   }
 
 }
