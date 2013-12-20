@@ -20,7 +20,9 @@ object ClimbId {
 
 case class Climb(
     id: ClimbId,
-    name: String)
+    cragId: CragId,
+    name: String,
+    description: String)
 
 
 /*****************************************************************************
@@ -30,7 +32,9 @@ case class Climb(
 sealed trait ClimbEvent
 case class ClimbCreated(
     id: ClimbId,
-    name: String) extends ClimbEvent
+    cragId: CragId,
+    name: String,
+    description: String) extends ClimbEvent
 
 case class ClimbDeDuplicated(
     kept: Keep[ClimbId],
@@ -52,7 +56,7 @@ trait ClimbsModule[M[+_]] {
   trait ClimbService {
 
     // commands
-    def create(name: String): M[Validated[ClimbId]]
+    def create(name: String, description: String, crag: CragId): M[Validated[ClimbId]]
     def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): M[Validated[ClimbId]]
 
     // queries
@@ -100,8 +104,8 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
      * Service implementation
      ************************************************************************/
 
-    def create(name: String): Future[Validated[ClimbId]] = {
-      val cmd = CreateCmd(name)
+    def create(name: String, description: String, crag: CragId): Future[Validated[ClimbId]] = {
+      val cmd = CreateCmd(crag, name, description)
       for {
         id    <- (singleWriter ? cmd).mapTo[ClimbId]
       } yield id.success
@@ -139,7 +143,7 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
      * Commands
      */
     private sealed trait Cmd
-    private case class CreateCmd(name: String) extends Cmd
+    private case class CreateCmd(cragId: CragId, name: String, description: String) extends Cmd
     private case class DeDupeCmd(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) extends Cmd
 
 
@@ -193,8 +197,8 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
        *************************************************************************/
 
       private[this] def updateState(e: ClimbEvent) = e match {
-        case ClimbCreated(id, name) =>
-          climbsImage = climbsImage.addClimb((Climb(id, name)))
+        case ClimbCreated(id, cragId, name, desc) =>
+          climbsImage = climbsImage.addClimb((Climb(id, cragId, name, desc)))
 
         case ClimbDeDuplicated(kept, removed) =>
           climbsImage = climbsImage.deDupeClimb(kept, removed)
@@ -287,7 +291,7 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
 
       private[this] def handleCreation(cmd: CreateCmd) = {
         val id = ClimbId.createRandom()
-        val event = ClimbCreated(id, cmd.name)
+        val event = ClimbCreated(id, cmd.cragId, cmd.name, cmd.description)
         persist(event) { e =>
           updateState(e)
           sender ! id

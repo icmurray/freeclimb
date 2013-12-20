@@ -17,12 +17,33 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing.{Directives, RejectionHandler, Rejection}
 import spray.http.StatusCodes
 
-import org.freeclimbers.core.{Climb, ClimbId, ClimbsModule}
+import org.freeclimbers.core.{Climb, ClimbId, ClimbsModule, CragId}
 
-case class ClimbCreation(name: String)
+trait UtilFormats {
+  implicit val uuidJsonFormat = new JsonFormat[UUID] {
+    def read(json: JsValue) = {
+      try {
+        json match {
+          case JsString(s) => UUID.fromString(s)
+        }
+      } catch {
+        case t: Throwable => throw new DeserializationException("UUID expected")
+      }
+    }
 
-object ClimbCreation {
-  implicit val asJson = jsonFormat(ClimbCreation.apply _, "name")
+    def write(uuid: UUID) = {
+      JsString(uuid.toString)
+    }
+  }
+}
+
+case class ClimbCreation(
+    name: String,
+    description: String,
+    cragUUID: UUID)
+
+object ClimbCreation extends UtilFormats {
+  implicit val asJson = jsonFormat(ClimbCreation.apply _, "name", "description", "crag_id")
 }
 
 case class ClimbResource(id: String, name: String)
@@ -32,25 +53,12 @@ object ClimbResource {
 }
 
 trait ClimbRoutes[M[+_]] extends Directives
+                            with UtilFormats
                             with RouteUtils
                             with MarshallingUtils {
   this: ClimbsModule[M] with HigherKindedUtils[M] =>
 
-  implicit private val uuidJsonFormat = new JsonFormat[UUID] {
-    def read(json: JsValue) = ???
-    def write(uuid: UUID) = {
-      JsString(uuid.toString)
-    }
-  }
-
   implicit private val climbIdJsonFormat = jsonFormat(ClimbId.apply _, "id")
-  implicit private val climbJsonFormat = new JsonFormat[Climb] {
-    def read(json: JsValue) = ???
-    def write(climb: Climb) = JsObject(
-      "name" -> climb.name.toJson,
-      "id"   -> climb.id.uuid.toString.toJson
-    )
-  }
 
   def climbRoutes = {
     path("climbs") {
@@ -58,7 +66,7 @@ trait ClimbRoutes[M[+_]] extends Directives
         entity(as[ClimbCreation]) { climb =>
           mapSuccessStatusTo(StatusCodes.Created) {
             complete {
-              climbs.create(climb.name)
+              climbs.create(climb.name, climb.description, CragId(climb.cragUUID))
             }
           }
         }

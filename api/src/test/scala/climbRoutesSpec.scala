@@ -19,7 +19,7 @@ import spray.testkit.ScalatestRouteTest
 import scalaz._
 import Scalaz._
 
-import org.freeclimbers.core.{Climb, ClimbId, ClimbsModule}
+import org.freeclimbers.core.{Climb, ClimbId, ClimbsModule, CragId}
 
 class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
                                        with ScalatestRouteTest
@@ -30,17 +30,21 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
     withClimbsEndpoint { module =>
 
       val name = "Harvest"
+      val description = "Pretty hard"
+      val cragId = CragId.createRandom()
 
       val json = JsonEntity(s"""
         {
-          "name": "${name}"
+          "name": "${name}",
+          "description": "${description}",
+          "crag_id": "${cragId.uuid.toString}"
         }
       """)
 
       val climb = newClimb(name)
 
       (module.climbs.create _)
-        .expects(name)
+        .expects(name, description, cragId)
         .returning(climb.id.success)
 
       Post("/climbs", json) ~> module.climbRoutes ~> check {
@@ -54,14 +58,18 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
   "POST to /climbs" should "response with BadRequest if climb is invalid" in {
     withClimbsEndpoint { module =>
 
+      val cragId = CragId.createRandom()
+
       val json = JsonEntity(s"""
         {
-          "name": ""
+          "name": "",
+          "description": "Not blank",
+          "crag_id": "${cragId.uuid.toString}"
         }
       """)
 
       (module.climbs.create _)
-        .expects("")
+        .expects("", "Not blank", cragId)
         .returning(List("name cannot be blank").failure)
 
       Post("/climbs", json) ~> module.climbRoutes ~> check {
@@ -74,7 +82,8 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
     withClimbsEndpoint { module =>
 
       val id = ClimbId.createRandom()
-      val climb = Climb(id, "Harvest")
+      val cragId = CragId.createRandom()
+      val climb = Climb(id, cragId, "Harvest", "")
 
       (module.climbs.withId _)
         .expects(id)
@@ -93,7 +102,8 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
     withClimbsEndpoint { module =>
 
       val id = ClimbId.createRandom()
-      val climb = Climb(id, "Harvest")
+      val cragId = CragId.createRandom()
+      val climb = Climb(id, cragId, "Harvest", "")
 
       (module.climbs.withId _)
         .expects(id)
@@ -114,7 +124,8 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
 
       val removedId = ClimbId.createRandom()
       val id = ClimbId.createRandom()
-      val climb = Climb(id, "Harvest")
+      val cragId = CragId.createRandom()
+      val climb = Climb(id, cragId, "Harvest", "")
 
       (module.climbs.withId _)
         .expects(removedId)
@@ -130,8 +141,8 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
     }
   }
 
-  private def newClimb(name: String) = {
-    Climb(ClimbId.createRandom(), name)
+  private def newClimb(name: String, description: String = "") = {
+    Climb(ClimbId.createRandom(), CragId.createRandom(), name, description)
   }
 
   private def JsonEntity(s: String) = HttpEntity(`application/json`, s)

@@ -24,7 +24,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
   "A ClimbService" should "create new climbs" in {
     withClimbsModule { module =>
       val climbId = blockFor {
-        module.climbs.create("Right Unconquerable")
+        module.climbs.create("Right Unconquerable", "A pretty nice climb", CragId.createRandom())
       }
       climbId.isSuccess should equal (true)
 
@@ -42,8 +42,8 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
       implicit val ec = module.ec
       val (climbId1, climbId2) = blockFor {
         for {
-          c1 <- module.climbs.create("Climb 1")
-          c2 <- module.climbs.create("Climb 2")
+          c1 <- module.climbs.create("Climb 1", "", CragId.createRandom())
+          c2 <- module.climbs.create("Climb 2", "", CragId.createRandom())
         } yield (c1.toOption.get, c2.toOption.get)
       }
 
@@ -71,9 +71,9 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
       implicit val ec = module.ec
       val (climbId1, climbId2, climbId3) = blockFor {
         for {
-          c1 <- module.climbs.create("Climb 1")
-          c2 <- module.climbs.create("Climb 2")
-          c3 <- module.climbs.create("Climb 3")
+          c1 <- module.climbs.create("Climb 1", "", CragId.createRandom())
+          c2 <- module.climbs.create("Climb 2", "", CragId.createRandom())
+          c3 <- module.climbs.create("Climb 3", "", CragId.createRandom())
         } yield (c1.toOption.get, c2.toOption.get, c3.toOption.get)
       }
 
@@ -93,7 +93,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
       implicit val ec = module.ec
       val climbId = blockFor {
         for {
-          c1 <- module.climbs.create("Climb 1")
+          c1 <- module.climbs.create("Climb 1", "", CragId.createRandom())
         } yield c1.toOption.get
       }
 
@@ -109,10 +109,10 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers {
       implicit val ec = module.ec
       val (climbId1, climbId2, climbId3, climbId4) = blockFor {
         for {
-          c1 <- module.climbs.create("Climb 1")
-          c2 <- module.climbs.create("Climb 2")
-          c3 <- module.climbs.create("Climb 3")
-          c4 <- module.climbs.create("Climb 4")
+          c1 <- module.climbs.create("Climb 1", "", CragId.createRandom())
+          c2 <- module.climbs.create("Climb 2", "", CragId.createRandom())
+          c3 <- module.climbs.create("Climb 3", "", CragId.createRandom())
+          c4 <- module.climbs.create("Climb 4", "", CragId.createRandom())
         } yield (c1.toOption.get, c2.toOption.get, c3.toOption.get, c4.toOption.get)
       }
 
