@@ -72,7 +72,7 @@ trait ClimbsModule[M[+_]] {
  * Eventsourced-based implementation of the climb service.
  */
 trait EventsourcedClimbsModule extends ClimbsModule[Future] {
-    this: ActorSystemModule =>
+  this: ActorSystemModule with CragsModule[Future] =>
 
   import akka.actor._
   import akka.pattern.ask
@@ -105,10 +105,14 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
      ************************************************************************/
 
     def create(name: String, description: String, crag: CragId): Future[Validated[ClimbId]] = {
-      val cmd = CreateCmd(crag, name, description)
-      for {
-        id    <- (singleWriter ? cmd).mapTo[ClimbId]
-      } yield id.success
+      crags.withId(crag).flatMap { cragO =>
+        cragO match {
+          case None    => future { List("Unknown crag: ${crag.uuid}").failure }
+          case Some(_) =>
+            val cmd = CreateCmd(crag, name, description)
+            (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
+        }
+      }
     }
 
     def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Future[Validated[ClimbId]] = {
