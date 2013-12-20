@@ -52,15 +52,9 @@ object UserRegistered {
 
 trait UserRoutes[M[+_]] extends Directives
                            with RouteUtils
+                           with UtilFormats
                            with MarshallingUtils {
   this: UsersModule[M] with HigherKindedUtils[M] =>
-
-  implicit private val uuidJsonFormat = new JsonFormat[UUID] {
-    def read(json: JsValue) = ???
-    def write(uuid: UUID) = {
-      JsString(uuid.toString)
-    }
-  }
 
   implicit private val userTokenJsonFormat = jsonFormat(UserToken.apply _, "id")
 

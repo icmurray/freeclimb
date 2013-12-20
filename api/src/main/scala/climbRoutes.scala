@@ -19,24 +19,6 @@ import spray.http.StatusCodes
 
 import org.freeclimbers.core.{Climb, ClimbId, ClimbsModule, CragId}
 
-trait UtilFormats {
-  implicit val uuidJsonFormat = new JsonFormat[UUID] {
-    def read(json: JsValue) = {
-      try {
-        json match {
-          case JsString(s) => UUID.fromString(s)
-        }
-      } catch {
-        case t: Throwable => throw new DeserializationException("UUID expected")
-      }
-    }
-
-    def write(uuid: UUID) = {
-      JsString(uuid.toString)
-    }
-  }
-}
-
 case class ClimbCreation(
     name: String,
     description: String,
