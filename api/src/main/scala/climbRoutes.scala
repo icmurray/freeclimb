@@ -28,10 +28,17 @@ object ClimbCreation extends UtilFormats {
   implicit val asJson = jsonFormat(ClimbCreation.apply _, "name", "description", "crag_id")
 }
 
-case class ClimbResource(id: String, name: String)
-object ClimbResource {
-  def apply(climb: Climb): ClimbResource = ClimbResource(climb.id.uuid.toString, climb.name)
-  implicit val asJson = jsonFormat(ClimbResource.apply _, "id", "name")
+case class ClimbResource(
+    id: ClimbId,
+    name: String,
+    description: String,
+    crag: CragLink)
+
+object ClimbResource extends SupportJsonFormats {
+  def apply(climb: Climb): ClimbResource = {
+    ClimbResource(climb.id, climb.name, climb.description, CragLink(climb.cragId))
+  }
+  implicit val asJson = jsonFormat(ClimbResource.apply _, "id", "name", "description", "crag")
 }
 
 trait ClimbRoutes[M[+_]] extends Directives
