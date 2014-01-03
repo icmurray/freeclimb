@@ -19,7 +19,7 @@ import spray.testkit.ScalatestRouteTest
 import scalaz._
 import Scalaz._
 
-import org.freeclimbers.core.{Crag, CragId, CragsModule}
+import org.freeclimbers.core.{Crag, CragId, RoutesDatabaseModule}
 
 class CragRoutesSpec extends FlatSpec with ShouldMatchers
                                       with ScalatestRouteTest
@@ -40,7 +40,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
         }
       """)
 
-      (module.crags.create _)
+      (module.routesDB.createCrag _)
         .expects(name, description)
         .returning(crag.id.success)
 
@@ -64,7 +64,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
         }
       """)
 
-      (module.crags.create _)
+      (module.routesDB.createCrag _)
         .expects("", "Not blank")
         .returning(List("name cannot be blank").failure)
 
@@ -80,7 +80,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
       val id = CragId.createRandom()
       val crag = Crag(id, "Stanage", "It's pretty nice here.")
 
-      (module.crags.withId _)
+      (module.routesDB.cragById _)
         .expects(id)
         .returning(Some(crag))
 
@@ -98,7 +98,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
       val id = CragId.createRandom()
 
-      (module.crags.withId _)
+      (module.routesDB.cragById _)
         .expects(id)
         .returning(None)
 
@@ -114,12 +114,12 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
   private def JsonEntity(s: String) = HttpEntity(`application/json`, s)
 
-  private def withCragsEndpoint(f: CragRoutes[Id] with CragsModule[Id] => Unit) = {
+  private def withCragsEndpoint(f: CragRoutes[Id] with RoutesDatabaseModule[Id] => Unit) = {
 
-    val module = new CragRoutes[Id] with CragsModule[Id] with IdUtils with HttpService {
+    val module = new CragRoutes[Id] with RoutesDatabaseModule[Id] with IdUtils with HttpService {
       def actorRefFactory = system
       override def cragRoutes = sealRoute(super.cragRoutes)
-      override val crags = mock[CragService]
+      override val routesDB = mock[RoutesDBService]
       implicit def M = id
     }
 

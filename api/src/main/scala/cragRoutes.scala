@@ -17,7 +17,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing.{Directives, RejectionHandler, Rejection}
 import spray.http.StatusCodes
 
-import org.freeclimbers.core.{Crag, CragId, CragsModule}
+import org.freeclimbers.core.{Crag, CragId, RoutesDatabaseModule}
 
 case class CragCreation(
     name: String,
@@ -37,7 +37,7 @@ trait CragRoutes[M[+_]] extends Directives
                            with UtilFormats
                            with RouteUtils
                            with MarshallingUtils {
-  this: CragsModule[M] with HigherKindedUtils[M] =>
+  this: RoutesDatabaseModule[M] with HigherKindedUtils[M] =>
 
   implicit private val cragIdJsonFormat = jsonFormat(CragId.apply _, "id")
 
@@ -47,7 +47,7 @@ trait CragRoutes[M[+_]] extends Directives
         entity(as[CragCreation]) { crag =>
           mapSuccessStatusTo(StatusCodes.Created) {
             complete {
-              crags.create(crag.name, crag.description)
+              routesDB.createCrag(crag.name, crag.description)
             }
           }
         }
@@ -57,7 +57,7 @@ trait CragRoutes[M[+_]] extends Directives
       val id = CragId(uuid)
       get {
         complete {
-          crags.withId(id).map(_.map(CragResource.apply))
+          routesDB.cragById(id).map(_.map(CragResource.apply))
         }
       }
     }

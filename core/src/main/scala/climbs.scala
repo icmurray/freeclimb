@@ -30,7 +30,7 @@ case class Climb(
  *****************************************************************************/
 
 sealed trait ClimbEvent
-case class ClimbCreated(
+case class CilmbCreatedOld(
     id: ClimbId,
     cragId: CragId,
     name: String,
@@ -72,7 +72,7 @@ trait ClimbsModule[M[+_]] {
  * Eventsourced-based implementation of the climb service.
  */
 trait EventsourcedClimbsModule extends ClimbsModule[Future] {
-  this: ActorSystemModule with CragsModule[Future] =>
+  this: ActorSystemModule =>
 
   import akka.actor._
   import akka.pattern.ask
@@ -105,14 +105,8 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
      ************************************************************************/
 
     def create(name: String, description: String, crag: CragId): Future[Validated[ClimbId]] = {
-      crags.withId(crag).flatMap { cragO =>
-        cragO match {
-          case None    => future { List("Unknown crag: ${crag.uuid}").failure }
-          case Some(_) =>
-            val cmd = CreateCmd(crag, name, description)
-            (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
-        }
-      }
+      val cmd = CreateCmd(crag, name, description)
+      (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
     }
 
     def deDuplicate(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Future[Validated[ClimbId]] = {
@@ -201,7 +195,7 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
        *************************************************************************/
 
       private[this] def updateState(e: ClimbEvent) = e match {
-        case ClimbCreated(id, cragId, name, desc) =>
+        case CilmbCreatedOld(id, cragId, name, desc) =>
           climbsImage = climbsImage.addClimb((Climb(id, cragId, name, desc)))
 
         case ClimbDeDuplicated(kept, removed) =>
@@ -280,7 +274,7 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
 
       private[this] def updateState(e: ClimbEvent) = {
         e match {
-          case e: ClimbCreated =>
+          case e: CilmbCreatedOld =>
             state = state.addClimb(e.id)
 
           case ClimbDeDuplicated(_, removed) =>
@@ -295,7 +289,7 @@ trait EventsourcedClimbsModule extends ClimbsModule[Future] {
 
       private[this] def handleCreation(cmd: CreateCmd) = {
         val id = ClimbId.createRandom()
-        val event = ClimbCreated(id, cmd.cragId, cmd.name, cmd.description)
+        val event = CilmbCreatedOld(id, cmd.cragId, cmd.name, cmd.description)
         persist(event) { e =>
           updateState(e)
           sender ! id

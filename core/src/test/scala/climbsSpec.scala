@@ -179,7 +179,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
       implicit val ec = module.ec
       val cragId = CragId.createRandom()
 
-      (module.crags.withId _)
+      (module.routesDB.cragById _)
         .expects(cragId)
         .returning(future { None })
 
@@ -192,7 +192,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   }
 
   // For brevity...
-  type ModuleUnderTest = ClimbsModule[Future] with CragsModule[Future] with ActorSystemModule
+  type ModuleUnderTest = ClimbsModule[Future] with RoutesDatabaseModule[Future] with ActorSystemModule
 
   private def blockFor[T](f: => Future[T]): T = {
     Await.result(f, 2.seconds)
@@ -201,10 +201,10 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   private def withClimbsModule(f: ModuleUnderTest => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
-      val module = new EventsourcedClimbsModule with CragsModule[Future] with ActorSystemModule {
+      val module = new EventsourcedClimbsModule with RoutesDatabaseModule[Future] with ActorSystemModule {
         implicit def M = scalaFuture.futureInstance
         override lazy val actorSystem = system
-        override val crags = mock[CragService]
+        override val routesDB = mock[RoutesDBService]
       }
       f(module)
     } finally {
@@ -215,7 +215,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   private def withMockCrag(f: Crag => Unit)(implicit module: ModuleUnderTest) = {
     implicit val ec = module.ec
     val crag = Crag(CragId.createRandom(), "A Crag", "A Crag Description")
-    (module.crags.withId _)
+    (module.routesDB.cragById _)
       .expects(crag.id)
       .anyNumberOfTimes
       .returning(future { Some(crag) })

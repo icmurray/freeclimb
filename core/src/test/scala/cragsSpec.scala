@@ -24,21 +24,21 @@ import com.typesafe.config.ConfigFactory
 class CragServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
 
   "A CragService" should "create new crags" in {
-    withCragsModule { implicit module =>
+    withRoutesDatabaseModule { implicit module =>
       val cragId = blockFor {
-        module.crags.create("Stanage", "A pretty nice crag")
+        module.routesDB.createCrag("Stanage", "A pretty nice crag")
       }
       cragId.isSuccess should equal (true)
 
       val crag = blockFor {
-        module.crags.withId(cragId.toOption.get)
+        module.routesDB.cragById(cragId.toOption.get)
       }
 
       crag should not equal (None)
       crag.get.name should equal ("Stanage")
 
       val allCrags = blockFor {
-        module.crags.list()
+        module.routesDB.crags()
       }
 
       allCrags.length should equal (1)
@@ -47,16 +47,16 @@ class CragServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   }
 
   // For brevity...
-  type ModuleUnderTest = CragsModule[Future] with ActorSystemModule
+  type ModuleUnderTest = RoutesDatabaseModule[Future] with ActorSystemModule
 
   private def blockFor[T](f: => Future[T]): T = {
     Await.result(f, 2.seconds)
   }
 
-  private def withCragsModule(f: ModuleUnderTest => Unit) = {
+  private def withRoutesDatabaseModule(f: ModuleUnderTest => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
-      val module = new EventsourcedCragsModule with ActorSystemModule {
+      val module = new EventsourcedRoutesDatabaseModule with ActorSystemModule {
         implicit def M = scalaFuture.futureInstance
         override lazy val actorSystem = system
       }
