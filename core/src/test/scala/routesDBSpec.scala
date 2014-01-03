@@ -21,10 +21,10 @@ import scalaz.contrib.std.scalaFuture
 
 import com.typesafe.config.ConfigFactory
 
-class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
+class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
 
   "A ClimbService" should "create new climbs" in {
-    withClimbsModule { implicit module =>
+    withRoutesDatabaseModule { implicit module =>
       withMockCrag { cragId =>
 
         val climbId = blockFor {
@@ -43,7 +43,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   }
 
   "A ClimbService" should "merge 2 climbs" in {
-    withClimbsModule { implicit module =>
+    withRoutesDatabaseModule { implicit module =>
       withMockCrag { cragId =>
         implicit val ec = module.ec
         val (climbId1, climbId2) = blockFor {
@@ -74,7 +74,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   }
   
   "A ClimbService" should "not follow redirect chains" in {
-    withClimbsModule { implicit module =>
+    withRoutesDatabaseModule { implicit module =>
       withMockCrag { cragId =>
         implicit val ec = module.ec
         val (climbId1, climbId2, climbId3) = blockFor {
@@ -98,7 +98,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   }
   
   "A ClimbService" should "not allow redirecting to oneself" in {
-    withClimbsModule { implicit module =>
+    withRoutesDatabaseModule { implicit module =>
       withMockCrag { cragId =>
         implicit val ec = module.ec
         val climbId = blockFor {
@@ -116,7 +116,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   }
 
   "A ClimbService" should "re-establish existing redirects" in {
-    withClimbsModule { implicit module =>
+    withRoutesDatabaseModule { implicit module =>
       withMockCrag { cragId =>
         implicit val ec = module.ec
         val (climbId1, climbId2, climbId3, climbId4) = blockFor {
@@ -175,7 +175,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   }
 
   "A ClimbService" should "not create climbs in crags that don't exist" in {
-    withClimbsModule { implicit module =>
+    withRoutesDatabaseModule { implicit module =>
       implicit val ec = module.ec
       val cragId = CragId.createRandom()
 
@@ -187,6 +187,29 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
     }
   }
 
+  "A CragService" should "create new crags" in {
+    withRoutesDatabaseModule { implicit module =>
+      val cragId = blockFor {
+        module.routesDB.createCrag("Stanage", "A pretty nice crag")
+      }
+      cragId.isSuccess should equal (true)
+
+      val crag = blockFor {
+        module.routesDB.cragById(cragId.toOption.get)
+      }
+
+      crag should not equal (None)
+      crag.get.name should equal ("Stanage")
+
+      val allCrags = blockFor {
+        module.routesDB.crags()
+      }
+
+      allCrags.length should equal (1)
+      allCrags(0).name should equal ("Stanage")
+    }
+  }
+
   // For brevity...
   type ModuleUnderTest = RoutesDatabaseModule[Future] with ActorSystemModule
 
@@ -194,7 +217,7 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
     Await.result(f, 2.seconds)
   }
 
-  private def withClimbsModule(f: ModuleUnderTest => Unit) = {
+  private def withRoutesDatabaseModule(f: ModuleUnderTest => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
       val module = new EventsourcedRoutesDatabaseModule with ActorSystemModule {
