@@ -210,6 +210,115 @@ class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers with MockFactory 
     }
   }
 
+  "A RoutesDBService" should "list all crags" in {
+    withRoutesDatabaseModule { implicit module =>
+      implicit val ec = module.ec
+      val (cragId1, cragId2) = blockFor {
+        for {
+          c1 <- module.routesDB.createCrag("Crag 1", "")
+          c2 <- module.routesDB.createCrag("Crag 2", "")
+        } yield (c1, c2)
+      }
+
+      cragId1.isSuccess should equal (true)
+      cragId2.isSuccess should equal (true)
+
+      val allCragIds = blockFor {
+        module.routesDB.crags().map(_.map(_.id))
+      }
+
+      allCragIds should contain (cragId1.toOption.get)
+      allCragIds should contain (cragId2.toOption.get)
+      allCragIds.length should equal (2)
+    }
+  }
+
+  "A RoutesDBService" should "list all climbs" in {
+    withRoutesDatabaseModule { implicit module =>
+      withMockCrag { cragId =>
+        implicit val ec = module.ec
+        val (climbId1, climbId2) = blockFor {
+          for {
+            c1 <- module.routesDB.createClimb("Climb 1", "", cragId)
+            c2 <- module.routesDB.createClimb("Climb 2", "", cragId)
+          } yield (c1, c2)
+        }
+
+        climbId1.isSuccess should equal (true)
+        climbId2.isSuccess should equal (true)
+
+        val allClimbIds = blockFor {
+          module.routesDB.climbs().map(_.map(_.id))
+        }
+        allClimbIds should contain (climbId1.toOption.get)
+        allClimbIds should contain (climbId2.toOption.get)
+        allClimbIds.length should equal (2)
+      }
+    }
+  }
+
+  "A RoutesDBService" should "list all climbs within given crag" in {
+    withRoutesDatabaseModule { implicit module =>
+      withMockCrag { cragId1 =>
+        withMockCrag { cragId2 =>
+          implicit val ec = module.ec
+          val (climbId1, climbId2) = blockFor {
+            for {
+              c1 <- module.routesDB.createClimb("Climb 1", "", cragId1)
+              c2 <- module.routesDB.createClimb("Climb 2", "", cragId2)
+            } yield (c1, c2)
+          }
+
+          climbId1.isSuccess should equal (true)
+          climbId2.isSuccess should equal (true)
+
+          val crag1ClimbIds = blockFor {
+            module.routesDB.climbsOf(cragId1).map(_.map(_.id))
+          }
+          crag1ClimbIds should contain (climbId1.toOption.get)
+          crag1ClimbIds.length should equal (1)
+        }
+      }
+    }
+  }
+
+  "A RoutesDBService" should "not list climbs removed by merging" in {
+    withRoutesDatabaseModule { implicit module =>
+      withMockCrag { cragId1 =>
+        withMockCrag { cragId2 =>
+          implicit val ec = module.ec
+          val (c1, c2, c3, c4) = blockFor {
+            for {
+              c1 <- module.routesDB.createClimb("Climb 1", "", cragId1)
+              c2 <- module.routesDB.createClimb("Climb 2", "", cragId1)
+              c3 <- module.routesDB.createClimb("Climb 3", "", cragId1)
+              c4 <- module.routesDB.createClimb("Climb 4", "", cragId2)
+            } yield (c1.toOption.get, c2.toOption.get, c3.toOption.get, c4.toOption.get)
+          }
+
+          blockFor {
+            module.routesDB.mergeClimbs(Keep(c1), Remove(c2))
+          }
+
+          val allClimbs = blockFor {
+            module.routesDB.climbs.map(_.map(_.id))
+          }
+          allClimbs should contain (c1)
+          allClimbs should contain (c3)
+          allClimbs should contain (c4)
+          allClimbs.length should equal (3)
+
+          val crag1ClimbIds = blockFor {
+            module.routesDB.climbsOf(cragId1).map(_.map(_.id))
+          }
+          crag1ClimbIds should contain (c1)
+          crag1ClimbIds should contain (c3)
+          crag1ClimbIds.length should equal (2)
+        }
+      }
+    }
+  }
+
   // For brevity...
   type ModuleUnderTest = RoutesDatabaseModule[Future] with ActorSystemModule
 
@@ -233,7 +342,8 @@ class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers with MockFactory 
   private def withMockCrag(f: CragId => Unit)(implicit module: ModuleUnderTest) = {
     implicit val ec = module.ec
     val cragF = module.routesDB.createCrag("A Crag", "A Crag Description")
-    cragF.map(_.map(f))
+    val crag = blockFor(cragF)
+    crag.map(f)
   }
 
   private lazy val unitTestConfig = {

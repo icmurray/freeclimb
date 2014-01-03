@@ -147,8 +147,13 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
       (readModel ? ClimbByIdQ(id)).mapTo[Option[Climb]]
     }
 
-    def climbs() = ???
-    def climbsOf(crag: CragId) = ???
+    def climbs() = {
+      (readModel ? ListClimbsQ).mapTo[Seq[Climb]]
+    }
+
+    def climbsOf(crag: CragId) = {
+      (readModel ? ListClimbsOfQ(crag)).mapTo[Seq[Climb]]
+    }
 
     def crags(): Future[Seq[Crag]] = {
       (readModel ? ListCragsQ).mapTo[Seq[Crag]]
@@ -295,7 +300,7 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
         def addClimb(climb: Climb) = ClimbsRepo(
           byId + (climb.id -> climb),
           adjust(byCrag, climb.cragId) {
-            case None         => Seq()
+            case None         => Seq(climb)
             case Some(climbs) => climb +: climbs
           },
           redirects + (climb.id -> climb))
@@ -384,7 +389,7 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
             val event = ClimbCreated(cmd.crag, id, cmd.name, cmd.description)
             persist(event) { e =>
               updateState(e)
-              sender ! id
+              sender ! id.success
             }
         }
       }
