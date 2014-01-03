@@ -76,6 +76,8 @@ class CragServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
         class = "org.freeclimbers.core.NullJournal"
         plugin-dispatcher = "akka.actor.default-dispatcher"
       }
+
+      akka.log-dead-letters-during-shutdown = off
     }
     """)
 

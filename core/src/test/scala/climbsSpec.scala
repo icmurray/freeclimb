@@ -25,10 +25,10 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
 
   "A ClimbService" should "create new climbs" in {
     withClimbsModule { implicit module =>
-      withMockCrag { crag =>
+      withMockCrag { cragId =>
 
         val climbId = blockFor {
-          module.routesDB.createClimb("Right Unconquerable", "A pretty nice climb", crag.id)
+          module.routesDB.createClimb("Right Unconquerable", "A pretty nice climb", cragId)
         }
         climbId.isSuccess should equal (true)
 
@@ -44,12 +44,12 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
 
   "A ClimbService" should "merge 2 climbs" in {
     withClimbsModule { implicit module =>
-      withMockCrag { crag =>
+      withMockCrag { cragId =>
         implicit val ec = module.ec
         val (climbId1, climbId2) = blockFor {
           for {
-            c1 <- module.routesDB.createClimb("Climb 1", "", crag.id)
-            c2 <- module.routesDB.createClimb("Climb 2", "", crag.id)
+            c1 <- module.routesDB.createClimb("Climb 1", "", cragId)
+            c2 <- module.routesDB.createClimb("Climb 2", "", cragId)
           } yield (c1.toOption.get, c2.toOption.get)
         }
 
@@ -75,13 +75,13 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   
   "A ClimbService" should "not follow redirect chains" in {
     withClimbsModule { implicit module =>
-      withMockCrag { crag =>
+      withMockCrag { cragId =>
         implicit val ec = module.ec
         val (climbId1, climbId2, climbId3) = blockFor {
           for {
-            c1 <- module.routesDB.createClimb("Climb 1", "", crag.id)
-            c2 <- module.routesDB.createClimb("Climb 2", "", crag.id)
-            c3 <- module.routesDB.createClimb("Climb 3", "", crag.id)
+            c1 <- module.routesDB.createClimb("Climb 1", "", cragId)
+            c2 <- module.routesDB.createClimb("Climb 2", "", cragId)
+            c3 <- module.routesDB.createClimb("Climb 3", "", cragId)
           } yield (c1.toOption.get, c2.toOption.get, c3.toOption.get)
         }
 
@@ -99,11 +99,11 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   
   "A ClimbService" should "not allow redirecting to oneself" in {
     withClimbsModule { implicit module =>
-      withMockCrag { crag =>
+      withMockCrag { cragId =>
         implicit val ec = module.ec
         val climbId = blockFor {
           for {
-            c1 <- module.routesDB.createClimb("Climb 1", "", crag.id)
+            c1 <- module.routesDB.createClimb("Climb 1", "", cragId)
           } yield c1.toOption.get
         }
 
@@ -117,14 +117,14 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
 
   "A ClimbService" should "re-establish existing redirects" in {
     withClimbsModule { implicit module =>
-      withMockCrag { crag =>
+      withMockCrag { cragId =>
         implicit val ec = module.ec
         val (climbId1, climbId2, climbId3, climbId4) = blockFor {
           for {
-            c1 <- module.routesDB.createClimb("Climb 1", "", crag.id)
-            c2 <- module.routesDB.createClimb("Climb 2", "", crag.id)
-            c3 <- module.routesDB.createClimb("Climb 3", "", crag.id)
-            c4 <- module.routesDB.createClimb("Climb 4", "", crag.id)
+            c1 <- module.routesDB.createClimb("Climb 1", "", cragId)
+            c2 <- module.routesDB.createClimb("Climb 2", "", cragId)
+            c3 <- module.routesDB.createClimb("Climb 3", "", cragId)
+            c4 <- module.routesDB.createClimb("Climb 4", "", cragId)
           } yield (c1.toOption.get, c2.toOption.get, c3.toOption.get, c4.toOption.get)
         }
 
@@ -179,10 +179,6 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
       implicit val ec = module.ec
       val cragId = CragId.createRandom()
 
-      (module.routesDB.cragById _)
-        .expects(cragId)
-        .returning(future { None })
-
       val climbId = blockFor {
         module.routesDB.createClimb("Right Unconquerable", "A pretty nice climb", cragId)
       }
@@ -201,10 +197,9 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
   private def withClimbsModule(f: ModuleUnderTest => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
-      val module = new RoutesDatabaseModule[Future] with ActorSystemModule {
+      val module = new EventsourcedRoutesDatabaseModule with ActorSystemModule {
         implicit def M = scalaFuture.futureInstance
         override lazy val actorSystem = system
-        override val routesDB = mock[RoutesDBService]
       }
       f(module)
     } finally {
@@ -212,14 +207,10 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
     }
   }
 
-  private def withMockCrag(f: Crag => Unit)(implicit module: ModuleUnderTest) = {
+  private def withMockCrag(f: CragId => Unit)(implicit module: ModuleUnderTest) = {
     implicit val ec = module.ec
-    val crag = Crag(CragId.createRandom(), "A Crag", "A Crag Description")
-    (module.routesDB.cragById _)
-      .expects(crag.id)
-      .anyNumberOfTimes
-      .returning(future { Some(crag) })
-    f(crag)
+    val cragF = module.routesDB.createCrag("A Crag", "A Crag Description")
+    cragF.map(_.map(f))
   }
 
   private lazy val unitTestConfig = {
@@ -232,6 +223,8 @@ class ClimbServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
         class = "org.freeclimbers.core.NullJournal"
         plugin-dispatcher = "akka.actor.default-dispatcher"
       }
+
+      akka.log-dead-letters-during-shutdown = off
     }
     """)
 

@@ -127,7 +127,7 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
 
     def createClimb(name: String, description: String, crag: CragId) = {
       val cmd = CreateClimbCmd(name, description, crag)
-      (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
+      (singleWriter ? cmd).mapTo[Validated[ClimbId]]
     }
 
     def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
@@ -376,11 +376,16 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
       }
 
       private[this] def handleClimbCreation(cmd: CreateClimbCmd) = {
-        val id = ClimbId.createRandom()
-        val event = ClimbCreated(cmd.crag, id, cmd.name, cmd.description)
-        persist(event) { e =>
-          updateState(e)
-          sender ! id
+        state.cragIds.contains(cmd.crag) match {
+          case false =>
+            sender ! List("Specified crag does not exist").failure
+          case true  =>
+            val id = ClimbId.createRandom()
+            val event = ClimbCreated(cmd.crag, id, cmd.name, cmd.description)
+            persist(event) { e =>
+              updateState(e)
+              sender ! id
+            }
         }
       }
 
