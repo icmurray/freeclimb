@@ -17,7 +17,7 @@ import spray.httpx.SprayJsonSupport._
 import spray.routing.{Directives, RejectionHandler, Rejection}
 import spray.http.StatusCodes
 
-import org.freeclimbers.core.{Climb, ClimbId, ClimbsModule, CragId}
+import org.freeclimbers.core.{Climb, ClimbId, RoutesDatabaseModule, CragId}
 
 case class ClimbCreation(
     name: String,
@@ -45,7 +45,7 @@ trait ClimbRoutes[M[+_]] extends Directives
                             with UtilFormats
                             with RouteUtils
                             with MarshallingUtils {
-  this: ClimbsModule[M] with HigherKindedUtils[M] =>
+  this: RoutesDatabaseModule[M] with HigherKindedUtils[M] =>
 
   implicit private val climbIdJsonFormat = jsonFormat(ClimbId.apply _, "id")
 
@@ -55,7 +55,7 @@ trait ClimbRoutes[M[+_]] extends Directives
         entity(as[ClimbCreation]) { climb =>
           mapSuccessStatusTo(StatusCodes.Created) {
             complete {
-              climbs.create(climb.name, climb.description, CragId(climb.cragUUID))
+              routesDB.createClimb(climb.name, climb.description, CragId(climb.cragUUID))
             }
           }
         }
@@ -66,10 +66,10 @@ trait ClimbRoutes[M[+_]] extends Directives
       get {
         rejectEmptyResponse {
           complete {
-            climbs.withId(id).map(_.map(ClimbResource.apply))
+            routesDB.climbById(id).map(_.map(ClimbResource.apply))
           }
         } ~ rejectEmptyResponse { ctx =>
-          climbs.resolvesTo(id).map {
+          routesDB.resolveClimb(id).map {
             case None => ctx.complete(None: Option[ClimbResource])
             case Some(climb) => ctx.redirect("/climbs/" + climb.id.uuid.toString,
                                              StatusCodes.MovedPermanently)

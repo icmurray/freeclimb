@@ -23,6 +23,17 @@ case class Crag(
     name: String,
     description: String)
 
+case class ClimbId(uuid: UUID) extends AnyVal
+object ClimbId {
+  def createRandom() = ClimbId(UUID.randomUUID())
+}
+
+case class Climb(
+    id: ClimbId,
+    cragId: CragId,
+    name: String,
+    description: String)
+
 
 /*****************************************************************************
  * Events
@@ -68,6 +79,7 @@ trait RoutesDatabaseModule[M[+_]] {
     // Note - query results are only *eventually* consistent with issued commands.
     def cragById(id: CragId): M[Option[Crag]]
     def climbById(id: ClimbId): M[Option[Climb]]
+    def resolveClimb(id: ClimbId): M[Option[Climb]]
     def crags(): M[Seq[Crag]]
     def climbs(): M[Seq[Climb]]
     def climbsOf(crag: CragId): M[Seq[Climb]]
@@ -113,14 +125,28 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
       (singleWriter ? cmd).mapTo[CragId].map(_.success)
     }
 
-    def createClimb(name: String, description: String, crag: CragId) = ???
-    def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = ???
+    def createClimb(name: String, description: String, crag: CragId) = {
+      val cmd = CreateClimbCmd(name, description, crag)
+      (singleWriter ? cmd).mapTo[ClimbId].map(_.success)
+    }
+
+    def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
+      val cmd = MergeClimbsCmd(toKeep, toRemove)
+      (singleWriter ? cmd).mapTo[Validated[ClimbId]]
+    }
 
     def cragById(id: CragId): Future[Option[Crag]] = {
       (readModel ? CragByIdQ(id)).mapTo[Option[Crag]]
     }
 
-    def climbById(id: ClimbId) = ???
+    def resolveClimb(id: ClimbId) = {
+      (readModel ? ClimbResolvesToQ(id)).mapTo[Option[Climb]]
+    }
+
+    def climbById(id: ClimbId) = {
+      (readModel ? ClimbByIdQ(id)).mapTo[Option[Climb]]
+    }
+
     def climbs() = ???
     def climbsOf(crag: CragId) = ???
 
@@ -136,12 +162,13 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
     /**
      * Queries
      */
-    private sealed trait CragQ
-    private case class ClimbByIdQ(id: ClimbId) extends CragQ
-    private case class CragByIdQ(id: CragId) extends CragQ
-    private case class ListClimbsOfQ(id: CragId) extends CragQ
-    private case object ListCragsQ extends CragQ
-    private case object ListClimbsQ extends CragQ
+    private sealed trait RoutesDBQ
+    private case class ClimbByIdQ(id: ClimbId) extends RoutesDBQ
+    private case class CragByIdQ(id: CragId) extends RoutesDBQ
+    private case class ListClimbsOfQ(id: CragId) extends RoutesDBQ
+    private case class ClimbResolvesToQ(id: ClimbId) extends RoutesDBQ
+    private case object ListCragsQ extends RoutesDBQ
+    private case object ListClimbsQ extends RoutesDBQ
 
     /**
      * Commands
@@ -200,6 +227,9 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
         case ClimbByIdQ(id) =>
           sender ! climbs.byId.get(id)
 
+        case ClimbResolvesToQ(id) =>
+          sender ! resolveClimb(id)
+
         case ListCragsQ =>
           sender ! crags.byId.values.toSeq
 
@@ -226,6 +256,24 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
           crags = crags.addCrag((Crag(id, name, desc)))
         case ClimbCreated(cragId, climbId, name, description) =>
           climbs = climbs.addClimb(Climb(climbId, cragId, name, description))
+        case ClimbsMerged(kept, removed) =>
+          climbs = climbs.mergeClimbs(kept, removed)
+      }
+
+      /**
+       * Resolve a potential redirect.
+       *
+       * Follows chained re-directs until it encounters a re-direct to itself.
+       * No attempt is made to break out of infinite loops as it assumed this is
+       * taken care of by not allowing them to be constructed in the first place.
+       */
+      @annotation.tailrec
+      private[this] def resolveClimb(id: ClimbId): Option[Climb] = {
+        climbs.redirects.get(id) match {
+          case None                            => None
+          case r@Some(climb) if climb.id == id => r
+          case Some(climb)                     => resolveClimb(climb.id)
+        }
       }
 
       /**
@@ -252,11 +300,11 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
           },
           redirects + (climb.id -> climb))
 
-        def deDupeClimb(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
+        def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
           val keep = redirects(toKeep.v)
           ClimbsRepo(
             byId - toRemove.v,
-            byCrag,
+            byCrag.mapValues(_.filter(_.id != toRemove.v)),
             redirects + (toRemove.v -> keep))
         }   
 
@@ -273,7 +321,7 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
     private class SingleWriter extends EventsourcedProcessor {
 
       private val channel = context.actorOf(Channel.props(), name="routes-db-events-channel")
-      private var state = CragData()
+      private var state = State()
 
       override def processorId = sharedProcessorId
 
@@ -308,6 +356,8 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
             state = state.addCrag(e.id)
           case e: ClimbCreated =>
             state = state.addClimb(e.climbId)
+          case ClimbsMerged(_, Remove(id)) =>
+            state = state.removeClimb(id)
         }
         notify(e)
       }
@@ -335,7 +385,22 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
       }
 
       private[this] def handleMerge(cmd: MergeClimbsCmd) = {
-        ???
+
+        val toKeep = cmd.toKeep.v
+        val toRemove = cmd.toRemove.v
+
+        if (toKeep == toRemove) {
+          sender ! List("Cannot merge a climb with itself").failure
+        } else if (! state.concreteClimbIds.contains(toKeep) ||
+                   ! state.concreteClimbIds.contains(toRemove)) {
+          sender ! List("Could not find both climb ids").failure
+        } else {
+          val event = ClimbsMerged(cmd.toKeep, cmd.toRemove)
+          persist(event) { e =>
+            updateState(e)
+            sender ! cmd.toKeep.v.success
+          }
+        }
       }
 
       /*************************************************************************
@@ -345,10 +410,15 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
       /**
        * The state required to ensure data integrity.
        */
-      private[this] case class CragData(concreteIds: Set[CragId] = Set()) {
-        def addCrag(id: CragId) = copy(concreteIds + id)
-        def removeCrag(id: CragId) = copy(concreteIds - id)
-        def addClimb(id: ClimbId) = ???
+
+      private[this] case class State(
+          cragIds: Set[CragId] = Set(),
+          concreteClimbIds: Set[ClimbId] = Set()) {
+
+        def addCrag(id: CragId) = copy(cragIds = cragIds + id)
+        def removeCrag(id: CragId) = copy(cragIds = cragIds - id)
+        def addClimb(id: ClimbId) = copy(concreteClimbIds = concreteClimbIds + id)
+        def removeClimb(id: ClimbId) = copy(concreteClimbIds = concreteClimbIds - id)
       }
     }
   }

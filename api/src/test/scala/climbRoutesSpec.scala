@@ -19,7 +19,7 @@ import spray.testkit.ScalatestRouteTest
 import scalaz._
 import Scalaz._
 
-import org.freeclimbers.core.{Climb, ClimbId, ClimbsModule, CragId}
+import org.freeclimbers.core.{Climb, ClimbId, RoutesDatabaseModule, CragId}
 
 class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
                                        with ScalatestRouteTest
@@ -43,7 +43,7 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
 
       val climb = newClimb(name)
 
-      (module.climbs.create _)
+      (module.routesDB.createClimb _)
         .expects(name, description, cragId)
         .returning(climb.id.success)
 
@@ -68,7 +68,7 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
         }
       """)
 
-      (module.climbs.create _)
+      (module.routesDB.createClimb _)
         .expects("", "Not blank", cragId)
         .returning(List("name cannot be blank").failure)
 
@@ -85,7 +85,7 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
       val cragId = CragId.createRandom()
       val climb = Climb(id, cragId, "Harvest", "")
 
-      (module.climbs.withId _)
+      (module.routesDB.climbById _)
         .expects(id)
         .returning(Some(climb))
 
@@ -105,11 +105,11 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
       val cragId = CragId.createRandom()
       val climb = Climb(id, cragId, "Harvest", "")
 
-      (module.climbs.withId _)
+      (module.routesDB.climbById _)
         .expects(id)
         .returning(None)
 
-      (module.climbs.resolvesTo _)
+      (module.routesDB.resolveClimb _)
         .expects(id)
         .returning(None)
 
@@ -127,11 +127,11 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
       val cragId = CragId.createRandom()
       val climb = Climb(id, cragId, "Harvest", "")
 
-      (module.climbs.withId _)
+      (module.routesDB.climbById _)
         .expects(removedId)
         .returning(None)
 
-      (module.climbs.resolvesTo _)
+      (module.routesDB.resolveClimb _)
         .expects(removedId)
         .returning(Some(climb))
 
@@ -147,12 +147,12 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
 
   private def JsonEntity(s: String) = HttpEntity(`application/json`, s)
 
-  private def withClimbsEndpoint(f: ClimbRoutes[Id] with ClimbsModule[Id] => Unit) = {
+  private def withClimbsEndpoint(f: ClimbRoutes[Id] with RoutesDatabaseModule[Id] => Unit) = {
 
-    val module = new ClimbRoutes[Id] with ClimbsModule[Id] with IdUtils with HttpService {
+    val module = new ClimbRoutes[Id] with RoutesDatabaseModule[Id] with IdUtils with HttpService {
       def actorRefFactory = system
       override def climbRoutes = sealRoute(super.climbRoutes)
-      override val climbs = mock[ClimbService]
+      override val routesDB = mock[RoutesDBService]
       implicit def M = id
     }
 
