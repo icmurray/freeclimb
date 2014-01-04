@@ -1,13 +1,9 @@
 package org.freeclimbers
 package core
 
-import scala.concurrent._
-import scala.concurrent.duration._
+import scala.concurrent.Future
 
-import akka.actor.{ActorSystem, Actor}
-import akka.testkit.TestKit
-import akka.persistence._
-import akka.persistence.journal._
+import akka.actor.{ActorSystem}
 
 import org.scalamock.scalatest.MockFactory
 
@@ -19,9 +15,9 @@ import scalaz.Id._
 import scalaz.contrib.std.scalaFuture._
 import scalaz.contrib.std.scalaFuture
 
-import com.typesafe.config.ConfigFactory
-
-class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers with MockFactory {
+class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers
+                                           with TestUtils
+                                           with MockFactory {
 
   "A ClimbService" should "create new climbs" in {
     withRoutesDatabaseModule { implicit module =>
@@ -311,23 +307,6 @@ class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers with MockFactory 
   // For brevity...
   type ModuleUnderTest = RoutesDatabaseModule[Future] with ActorSystemModule
 
-  private def blockFor[T](f: => Future[T]): T = {
-    Await.result(f, 2.seconds)
-  }
-
-  private def blockFor[T](f: => ValidatedT[Future, T]): Validated[T] = {
-    Await.result(f.run, 2.seconds)
-  }
-
-  private def runCommand[T](f: => ValidatedT[Future, T])(implicit ec: ExecutionContext): T = {
-    blockFor {
-      f.run.flatMap(_.fold(
-        left  => future { throw new Exception(left.toString) },
-        right => future { right }
-      ))
-    }
-  }
-
   private def withRoutesDatabaseModule(f: ModuleUnderTest => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
@@ -345,24 +324,6 @@ class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers with MockFactory 
     implicit val ec = module.ec
     val cragId = runCommand(module.routesDB.createCrag("A Crag", "A Crag Description"))
     f(cragId)
-  }
-
-  private lazy val unitTestConfig = {
-    val journalConfig = ConfigFactory.parseString(
-    """
-    {
-      akka.persistence.journal.plugin = "null_journal"
-
-      null_journal {
-        class = "org.freeclimbers.core.NullJournal"
-        plugin-dispatcher = "akka.actor.default-dispatcher"
-      }
-
-      akka.log-dead-letters-during-shutdown = off
-    }
-    """)
-
-    journalConfig withFallback ConfigFactory.load()
   }
 
 }

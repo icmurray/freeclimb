@@ -1,12 +1,8 @@
 package org.freeclimbers.core
 
-import scala.concurrent._
-import scala.concurrent.duration._
+import scala.concurrent.Future
 
-import akka.actor.{ActorSystem, Actor}
-import akka.testkit.TestKit
-import akka.persistence._
-import akka.persistence.journal._
+import akka.actor.{ActorSystem}
 
 import org.scalatest._
 import org.scalatest.matchers.ShouldMatchers
@@ -16,9 +12,8 @@ import scalaz.Id._
 import scalaz.contrib.std.scalaFuture._
 import scalaz.contrib.std.scalaFuture
 
-import com.typesafe.config.ConfigFactory
-
-class UserServiceSpec extends FlatSpec with ShouldMatchers {
+class UserServiceSpec extends FlatSpec with ShouldMatchers
+                                       with TestUtils {
 
   "A UserService" should "register new users" in {
     withUsersModule { module =>
@@ -142,23 +137,6 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  private def blockFor[T](f: => Future[T]): T = {
-    Await.result(f, 2.seconds)
-  }
-
-  private def blockFor[T](f: => ValidatedT[Future, T]): Validated[T] = {
-    Await.result(f.run, 2.seconds)
-  }
-
-  private def runCommand[T](f: => ValidatedT[Future, T])(implicit ec: ExecutionContext): T = {
-    blockFor {
-      f.run.flatMap(_.fold(
-        left  => future { throw new Exception(left.toString) },
-        right => future { right }
-      ))
-    }
-  }
-
   private def withUsersModule(f: UsersModule[Future] with ActorSystemModule => Unit) = {
     val system = ActorSystem.create("testing", unitTestConfig)
     try {
@@ -171,33 +149,4 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
       system.shutdown()
     }
   }
-
-  private lazy val unitTestConfig = {
-    val journalConfig = ConfigFactory.parseString(
-    """
-    {
-      akka.persistence.journal.plugin = "null_journal"
-
-      null_journal {
-        class = "org.freeclimbers.core.NullJournal"
-        plugin-dispatcher = "akka.actor.default-dispatcher"
-      }
-    }
-    """)
-
-    journalConfig withFallback ConfigFactory.load()
-  }
-
 }
-
-class NullJournal extends Actor with SyncWriteJournal {
-  import scala.concurrent.ExecutionContext.Implicits.global
-  def write(persistent: PersistentImpl): Unit = {}
-  def writeBatch(persistentBatch: Seq[PersistentImpl]): Unit = {}
-  def delete(persistent: PersistentImpl): Unit = {}
-  def confirm(processorId: String, sequenceNr: Long, channelId: String): Unit = {}
-  def replayAsync(processorId: String, fromSequenceNr: Long, toSequenceNr: Long)
-                 (replayCallback: PersistentImpl => Unit)
-                 : Future[Long] = future { 0L }
-}
-
