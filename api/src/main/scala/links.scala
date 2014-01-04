@@ -18,3 +18,11 @@ object CragLink extends SupportJsonFormats {
   implicit val asJson = jsonFormat(CragLink.apply _, "id", "href")
   private[this] def href(crag: CragId) = s"/crags/${crag.uuid.toString}"
 }
+
+case class CragClimbsListingLink(href: String)
+object CragClimbsListingLink extends SupportJsonFormats {
+  def ofCrag(crag: CragId): CragClimbsListingLink = CragClimbsListingLink(href(crag))
+
+  implicit val asJson = jsonFormat(CragClimbsListingLink.apply _, "href")
+  private[this] def href(crag: CragId) = s"/crags/${crag.uuid.toString}/climbs"
+}

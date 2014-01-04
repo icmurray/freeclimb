@@ -19,7 +19,7 @@ import spray.testkit.ScalatestRouteTest
 import scalaz._
 import Scalaz._
 
-import org.freeclimbers.core.{Crag, CragId, RoutesDatabaseModule}
+import org.freeclimbers.core.{Crag, CragId, RoutesDatabaseModule, ClimbId}
 import org.freeclimbers.core.{DomainError, Validated}
 
 class CragRoutesSpec extends FlatSpec with ShouldMatchers
@@ -91,6 +91,10 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
         json.fields("id") should equal(JsString(id.uuid.toString))
         json.fields("name") should equal(JsString(crag.name))
         json.fields("description") should equal(JsString(crag.description))
+
+        val expectedLink = CragClimbsListingLink.ofCrag(id)
+        json.fields("climbs").asInstanceOf[JsObject]
+            .fields("href") should equal (JsString(expectedLink.href))
       }
     }
   }
