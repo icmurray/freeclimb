@@ -97,7 +97,7 @@ object UserRegistered {
 /**
  * User service interface API
  */
-trait UsersModule[M[+_]] extends ValidatedResults[M] {
+trait UsersModule[M[+_]] extends CQService[M] {
 
   implicit def M: Monad[M]
 
@@ -107,15 +107,15 @@ trait UsersModule[M[+_]] extends ValidatedResults[M] {
 
     def register(email: Email,
                  firstName: String, lastName: String,
-                 pass: PlainText): Result[User]
+                 pass: PlainText): CResult[User]
 
     def login(email: Email,
-              password: PlainText): M[Option[UserToken]]
+              password: PlainText): QResult[Option[UserToken]]
 
-    def logout(token: UserToken): M[Unit]
+    def logout(token: UserToken): QResult[Unit]
 
-    def authenticate(email: Email, password: PlainText): M[Option[User]]
-    def authenticate(token: UserToken): M[Option[User]]
+    def authenticate(email: Email, password: PlainText): QResult[Option[User]]
+    def authenticate(token: UserToken): QResult[Option[User]]
   }
 
 }
@@ -153,7 +153,7 @@ trait ActorUsersModule extends UsersModule[Future] {
      ************************************************************************/
 
     def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
-      Result((processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]])
+      CResult((processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]])
     }
 
     def login(email: Email,

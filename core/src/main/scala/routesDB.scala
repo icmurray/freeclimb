@@ -63,7 +63,7 @@ case class ClimbsMerged(
 /**
  * The Crag service interface definitions
  */
-trait RoutesDatabaseModule[M[+_]] extends ValidatedResults[M] {
+trait RoutesDatabaseModule[M[+_]] extends CQService[M] {
   implicit def M: Monad[M]
 
   val routesDB: RoutesDBService
@@ -71,18 +71,18 @@ trait RoutesDatabaseModule[M[+_]] extends ValidatedResults[M] {
   trait RoutesDBService {
 
     // commands
-    def createCrag(name: String, description: String): Result[CragId]
-    def createClimb(name: String, description: String, crag: CragId): Result[ClimbId]
-    def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Result[ClimbId]
+    def createCrag(name: String, description: String): CResult[CragId]
+    def createClimb(name: String, description: String, crag: CragId): CResult[ClimbId]
+    def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): CResult[ClimbId]
 
     // queries
     // Note - query results are only *eventually* consistent with issued commands.
-    def cragById(id: CragId): M[Option[Crag]]
-    def climbById(id: ClimbId): M[Option[Climb]]
-    def resolveClimb(id: ClimbId): M[Option[Climb]]
-    def crags(): M[Seq[Crag]]
-    def climbs(): M[Seq[Climb]]
-    def climbsOf(crag: CragId): M[Seq[Climb]]
+    def cragById(id: CragId): QResult[Option[Crag]]
+    def climbById(id: ClimbId): QResult[Option[Climb]]
+    def resolveClimb(id: ClimbId): QResult[Option[Climb]]
+    def crags(): QResult[Seq[Crag]]
+    def climbs(): QResult[Seq[Climb]]
+    def climbsOf(crag: CragId): QResult[Seq[Climb]]
   }
 
 }
@@ -120,22 +120,22 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
      * Service implementation
      ************************************************************************/
 
-    def createCrag(name: String, description: String): Result[CragId] = {
+    def createCrag(name: String, description: String): CResult[CragId] = {
       val cmd = CreateCragCmd(name, description)
-      Result((singleWriter ? cmd).mapTo[Validated[CragId]])
+      CResult((singleWriter ? cmd).mapTo[Validated[CragId]])
     }
 
     def createClimb(name: String, description: String, crag: CragId) = {
       val cmd = CreateClimbCmd(name, description, crag)
-      Result((singleWriter ? cmd).mapTo[Validated[ClimbId]])
+      CResult((singleWriter ? cmd).mapTo[Validated[ClimbId]])
     }
 
     def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
       val cmd = MergeClimbsCmd(toKeep, toRemove)
-      Result((singleWriter ? cmd).mapTo[Validated[ClimbId]])
+      CResult((singleWriter ? cmd).mapTo[Validated[ClimbId]])
     }
 
-    def cragById(id: CragId): Future[Option[Crag]] = {
+    def cragById(id: CragId) = {
       (readModel ? CragByIdQ(id)).mapTo[Option[Crag]]
     }
 

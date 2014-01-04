@@ -43,7 +43,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.routesDB.createCrag _)
         .expects(name, description)
-        .returning(Result(crag.id.right))
+        .returning(CResult(crag.id.right))
 
       Post("/crags", json) ~> module.cragRoutes ~> check {
         status should equal (StatusCodes.Created)
@@ -67,7 +67,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.routesDB.createCrag _)
         .expects("", "Not blank")
-        .returning(Result(List("name cannot be blank").left))
+        .returning(CResult(List("name cannot be blank").left))
 
       Post("/crags", json) ~> module.cragRoutes ~> check {
         status should equal (StatusCodes.BadRequest)
@@ -127,7 +127,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
     f(module)
   }
 
-  private[this] def Result[T](t: Validated[T]) = EitherT[Id, DomainError, T](t)
+  private[this] def CResult[T](t: Validated[T]) = EitherT[Id, DomainError, T](t)
 
   implicit private val JsonUnmarshaller: Unmarshaller[JsObject] = {
     Unmarshaller.delegate[String, JsObject](MediaTypes.`application/json`) { string =>

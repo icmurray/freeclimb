@@ -47,7 +47,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(Result(newUser(email, firstName, lastName, plaintext).right))
+        .returning(CResult(newUser(email, firstName, lastName, plaintext).right))
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.Created)
@@ -78,7 +78,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(Result(List("User already exists").left))
+        .returning(CResult(List("User already exists").left))
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.BadRequest)
@@ -106,7 +106,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(Result(List("first_name cannot be empty",
+        .returning(CResult(List("first_name cannot be empty",
                                "password cannot be empty").left))
 
       Post("/user", json) ~> module.userRoutes ~> check {
@@ -224,7 +224,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
     f(module)
   }
 
-  private[this] def Result[T](t: Validated[T]) = EitherT[Id, DomainError, T](t)
+  private[this] def CResult[T](t: Validated[T]) = EitherT[Id, DomainError, T](t)
 
   implicit private val JsonUnmarshaller: Unmarshaller[JsObject] = {
     Unmarshaller.delegate[String, JsObject](MediaTypes.`application/json`) { string =>
