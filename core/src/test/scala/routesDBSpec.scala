@@ -210,6 +210,26 @@ class RoutesDBServiceSpec extends FlatSpec with ShouldMatchers
     }
   }
 
+  "Creating a Climb" should "add it to the Crag" in {
+    withRoutesDatabaseModule { implicit module =>
+      implicit val ec = module.ec
+      val cragId = runCommand {
+        module.routesDB.createCrag("Stanage", "A pretty nice crag")
+      }
+
+      val climbId = runCommand {
+        module.routesDB.createClimb("Harvest", "Pretty hard", cragId)
+      }
+
+      val crag = blockFor {
+        module.routesDB.cragById(cragId)
+      }
+
+      crag should not equal (None)
+      crag.get.climbIds should contain (climbId)
+    }
+  }
+
   "A CragService" should "not create crags with no name" in {
     withRoutesDatabaseModule { implicit module =>
       val cragId = blockFor {

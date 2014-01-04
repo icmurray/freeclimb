@@ -79,7 +79,8 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
     withCragsEndpoint { module =>
 
       val id = CragId.createRandom()
-      val crag = Crag(id, "Stanage", "It's pretty nice here.")
+      val climbIds = Set(ClimbId.createRandom(), ClimbId.createRandom())
+      val crag = Crag(id, "Stanage", "It's pretty nice here.", climbIds)
 
       (module.routesDB.cragById _)
         .expects(id)
@@ -118,9 +119,9 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
     withCragsEndpoint { module =>
 
       val someCrags = List(
-        Crag(CragId.createRandom(), "Crag 1", ""),
-        Crag(CragId.createRandom(), "Crag 2", ""),
-        Crag(CragId.createRandom(), "Crag 3", ""))
+        Crag(CragId.createRandom(), "Crag 1", "", Set(ClimbId.createRandom())),
+        Crag(CragId.createRandom(), "Crag 2", "", Set(ClimbId.createRandom())),
+        Crag(CragId.createRandom(), "Crag 3", "", Set(ClimbId.createRandom())))
 
       (module.routesDB.crags _)
         .expects()
@@ -135,7 +136,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
   }
 
   private def newCrag(name: String, description: String = "") = {
-    Crag(CragId.createRandom(), name, description)
+    Crag(CragId.createRandom(), name, description, Set())
   }
 
   private def JsonEntity(s: String) = HttpEntity(`application/json`, s)

@@ -21,7 +21,8 @@ object CragId {
 case class Crag(
     id: CragId,
     name: String,
-    description: String)
+    description: String,
+    climbIds: Set[ClimbId])
 
 case class ClimbId(uuid: UUID) extends AnyVal
 object ClimbId {
@@ -300,9 +301,11 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
 
       private[this] def updateState(e: RoutesDBEvent) = e match {
         case CragCreated(id, name, desc) =>
-          crags = crags.addCrag((Crag(id, name, desc)))
+          crags = crags.addCrag((Crag(id, name, desc, Set())))
         case ClimbCreated(cragId, climbId, name, description) =>
-          climbs = climbs.addClimb(Climb(climbId, cragId, name, description))
+          val climb = Climb(climbId, cragId, name, description)
+          climbs = climbs.addClimb(climb)
+          crags = crags.addClimb(climb)
         case ClimbsMerged(kept, removed) =>
           climbs = climbs.mergeClimbs(kept, removed)
       }
@@ -332,6 +335,13 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
         def addCrag(crag: Crag) = CragsRepo(
           byId + (crag.id -> crag))
 
+        def addClimb(climb: Climb) = CragsRepo(
+          adjust(byId, climb.cragId) {
+            case Some(c) => c.copy(climbIds = c.climbIds + climb.id)
+          }
+        )
+
+        private[this] def adjust[A,B](m: Map[A,B], k: A)(f: Option[B] => B) = m.updated(k, f(m.get(k)))
       }
 
       private[this] case class ClimbsRepo(
