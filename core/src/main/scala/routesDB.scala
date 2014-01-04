@@ -121,13 +121,17 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
      ************************************************************************/
 
     def createCrag(name: String, description: String): CResult[CragId] = {
-      val cmd = CreateCragCmd(name, description)
-      CResult((singleWriter ? cmd).mapTo[Validated[CragId]])
+      for {
+        cmd <- CreateCragCmd.validate(name, description)
+        id  <- CResult((singleWriter ? cmd).mapTo[Validated[CragId]])
+      } yield id
     }
 
     def createClimb(name: String, description: String, crag: CragId) = {
-      val cmd = CreateClimbCmd(name, description, crag)
-      CResult((singleWriter ? cmd).mapTo[Validated[ClimbId]])
+      for {
+        cmd <- CreateClimbCmd.validate(name, description, crag)
+        id  <- CResult((singleWriter ? cmd).mapTo[Validated[ClimbId]])
+      } yield id
     }
 
     def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
@@ -192,6 +196,44 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
     private case class MergeClimbsCmd(
         toKeep: Keep[ClimbId],
         toRemove: Remove[ClimbId]) extends Cmd
+
+    /**
+     * Command's companion objects.  Mostly validation.
+     */
+    private object CreateClimbCmd {
+      def validate(name: String,
+                   description: String,
+                   crag: CragId): CResult[CreateClimbCmd] = CResult(
+        (
+          validateName(name)  |@|
+          description.success |@|
+          crag.success
+        )(CreateClimbCmd.apply _).disjunction
+     )
+
+      private[this] def validateName(name: String) = {
+        name.trim match {
+          case "" => List("Climb name cannot be blank").failure
+          case s  => s.success
+        }
+      }
+    }
+
+    private object CreateCragCmd {
+      def validate(name: String, description: String) = CResult(
+        (
+          validateName(name)  |@|
+          description.success
+        )(CreateCragCmd.apply _).disjunction
+      )
+
+      private[this] def validateName(name: String) = {
+        name.trim match {
+          case "" => List("Crag name cannot be blank").failure
+          case s  => s.success
+        }
+      }
+    }
 
 
     /***************************************************************************
