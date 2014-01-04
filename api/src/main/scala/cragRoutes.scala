@@ -27,10 +27,10 @@ object CragCreation extends UtilFormats {
   implicit val asJson = jsonFormat(CragCreation.apply _, "name", "description")
 }
 
-case class CragResource(id: String, name: String)
+case class CragResource(id: String, name: String, description: String)
 object CragResource {
-  def apply(crag: Crag): CragResource = CragResource(crag.id.uuid.toString, crag.name)
-  implicit val asJson = jsonFormat(CragResource.apply _, "id", "name")
+  def apply(crag: Crag): CragResource = CragResource(crag.id.uuid.toString, crag.name, crag.description)
+  implicit val asJson = jsonFormat(CragResource.apply _, "id", "name", "description")
 }
 
 trait CragRoutes[M[+_]] extends Directives
@@ -50,6 +50,11 @@ trait CragRoutes[M[+_]] extends Directives
               routesDB.createCrag(crag.name, crag.description).run
             }
           }
+        }
+      } ~
+      get {
+        complete {
+          routesDB.crags.map(_.map(CragResource(_))).map(ListingResource.fromSeq)
         }
       }
     } ~

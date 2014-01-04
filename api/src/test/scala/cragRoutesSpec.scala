@@ -90,6 +90,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
         val json = responseAs[JsObject]
         json.fields("id") should equal(JsString(id.uuid.toString))
         json.fields("name") should equal(JsString(crag.name))
+        json.fields("description") should equal(JsString(crag.description))
       }
     }
   }
@@ -105,6 +106,26 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
       Get("/crags/" + id.uuid.toString) ~> module.cragRoutes ~> check {
         status should equal (StatusCodes.NotFound)
+      }
+    }
+  }
+
+  "GET /crags" should "list all crags" in {
+    withCragsEndpoint { module =>
+
+      val someCrags = List(
+        Crag(CragId.createRandom(), "Crag 1", ""),
+        Crag(CragId.createRandom(), "Crag 2", ""),
+        Crag(CragId.createRandom(), "Crag 3", ""))
+
+      (module.routesDB.crags _)
+        .expects()
+        .returning(someCrags)
+
+      Get("/crags") ~> module.cragRoutes ~> check {
+        status should equal (StatusCodes.OK)
+        val json = responseAs[JsObject]
+        json.fields("total") should equal(JsNumber(3))
       }
     }
   }
