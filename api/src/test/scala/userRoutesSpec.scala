@@ -21,6 +21,7 @@ import Scalaz._
 
 import org.freeclimbers.core.UsersModule
 import org.freeclimbers.core.{Email, PlainText, Digest, User, UserId, UserToken}
+import org.freeclimbers.core.{DomainError, Validated}
 
 class UserRoutesSpec extends FlatSpec with ShouldMatchers
                                       with ScalatestRouteTest
@@ -46,7 +47,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(newUser(email, firstName, lastName, plaintext).success)
+        .returning(Result(newUser(email, firstName, lastName, plaintext).right))
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.Created)
@@ -77,7 +78,7 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(List("User already exists").failure)
+        .returning(Result(List("User already exists").left))
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.BadRequest)
@@ -105,8 +106,8 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.users.register _)
         .expects(email, firstName, lastName, plaintext)
-        .returning(List("first_name cannot be empty",
-                        "password cannot be empty").failure)
+        .returning(Result(List("first_name cannot be empty",
+                               "password cannot be empty").left))
 
       Post("/user", json) ~> module.userRoutes ~> check {
         status should equal (StatusCodes.BadRequest)
@@ -222,6 +223,8 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
 
     f(module)
   }
+
+  private[this] def Result[T](t: Validated[T]) = EitherT[Id, DomainError, T](t)
 
   implicit private val JsonUnmarshaller: Unmarshaller[JsObject] = {
     Unmarshaller.delegate[String, JsObject](MediaTypes.`application/json`) { string =>

@@ -47,7 +47,7 @@ trait CragRoutes[M[+_]] extends Directives
         entity(as[CragCreation]) { crag =>
           mapSuccessStatusTo(StatusCodes.Created) {
             complete {
-              routesDB.createCrag(crag.name, crag.description)
+              routesDB.createCrag(crag.name, crag.description).run
             }
           }
         }

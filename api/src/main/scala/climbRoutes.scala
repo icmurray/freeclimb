@@ -55,7 +55,7 @@ trait ClimbRoutes[M[+_]] extends Directives
         entity(as[ClimbCreation]) { climb =>
           mapSuccessStatusTo(StatusCodes.Created) {
             complete {
-              routesDB.createClimb(climb.name, climb.description, CragId(climb.cragUUID))
+              routesDB.createClimb(climb.name, climb.description, CragId(climb.cragUUID)).run
             }
           }
         }

@@ -20,6 +20,7 @@ import scalaz._
 import Scalaz._
 
 import org.freeclimbers.core.{Crag, CragId, RoutesDatabaseModule}
+import org.freeclimbers.core.{DomainError, Validated}
 
 class CragRoutesSpec extends FlatSpec with ShouldMatchers
                                       with ScalatestRouteTest
@@ -42,7 +43,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.routesDB.createCrag _)
         .expects(name, description)
-        .returning(crag.id.success)
+        .returning(Result(crag.id.right))
 
       Post("/crags", json) ~> module.cragRoutes ~> check {
         status should equal (StatusCodes.Created)
@@ -66,7 +67,7 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
       (module.routesDB.createCrag _)
         .expects("", "Not blank")
-        .returning(List("name cannot be blank").failure)
+        .returning(Result(List("name cannot be blank").left))
 
       Post("/crags", json) ~> module.cragRoutes ~> check {
         status should equal (StatusCodes.BadRequest)
@@ -125,6 +126,8 @@ class CragRoutesSpec extends FlatSpec with ShouldMatchers
 
     f(module)
   }
+
+  private[this] def Result[T](t: Validated[T]) = EitherT[Id, DomainError, T](t)
 
   implicit private val JsonUnmarshaller: Unmarshaller[JsObject] = {
     Unmarshaller.delegate[String, JsObject](MediaTypes.`application/json`) { string =>

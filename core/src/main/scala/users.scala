@@ -67,7 +67,7 @@ object UserRegistered {
       validateFirstName(firstName)               |@|
       validateLastName(lastName)                 |@|
       Password.hash(pass).success
-    )(UserRegistered.apply _)
+    )(UserRegistered.apply _).disjunction
   }
 
   private val naiveEmailRx = """^[^@]+@.+""".r
@@ -97,7 +97,7 @@ object UserRegistered {
 /**
  * User service interface API
  */
-trait UsersModule[M[+_]] {
+trait UsersModule[M[+_]] extends ValidatedResults[M] {
 
   implicit def M: Monad[M]
 
@@ -107,7 +107,7 @@ trait UsersModule[M[+_]] {
 
     def register(email: Email,
                  firstName: String, lastName: String,
-                 pass: PlainText): M[Validated[User]]
+                 pass: PlainText): Result[User]
 
     def login(email: Email,
               password: PlainText): M[Option[UserToken]]
@@ -153,7 +153,7 @@ trait ActorUsersModule extends UsersModule[Future] {
      ************************************************************************/
 
     def register(email: Email, firstName: String, lastName: String, pass: PlainText) = {
-      (processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]]
+      Result((processor ? RegisterCmd(email, firstName, lastName, pass)).mapTo[Validated[User]])
     }
 
     def login(email: Email,
@@ -292,12 +292,12 @@ trait ActorUsersModule extends UsersModule[Future] {
             val user = event.createUser
             usersImage.byEmail.get(user.email) match {
               case Some(_) =>
-                sender ! List("User already exists").failure
+                sender ! List("User already exists").left
 
               case None =>
                 persist(event) { e =>
                   updateState(e)
-                  sender ! user.success
+                  sender ! user.right
                 }
             }
           }

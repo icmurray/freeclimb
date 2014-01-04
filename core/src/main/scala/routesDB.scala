@@ -63,7 +63,7 @@ case class ClimbsMerged(
 /**
  * The Crag service interface definitions
  */
-trait RoutesDatabaseModule[M[+_]] {
+trait RoutesDatabaseModule[M[+_]] extends ValidatedResults[M] {
   implicit def M: Monad[M]
 
   val routesDB: RoutesDBService
@@ -71,9 +71,9 @@ trait RoutesDatabaseModule[M[+_]] {
   trait RoutesDBService {
 
     // commands
-    def createCrag(name: String, description: String): M[Validated[CragId]]
-    def createClimb(name: String, description: String, crag: CragId): M[Validated[ClimbId]]
-    def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): M[Validated[ClimbId]]
+    def createCrag(name: String, description: String): Result[CragId]
+    def createClimb(name: String, description: String, crag: CragId): Result[ClimbId]
+    def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]): Result[ClimbId]
 
     // queries
     // Note - query results are only *eventually* consistent with issued commands.
@@ -120,19 +120,19 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
      * Service implementation
      ************************************************************************/
 
-    def createCrag(name: String, description: String): Future[Validated[CragId]] = {
+    def createCrag(name: String, description: String): Result[CragId] = {
       val cmd = CreateCragCmd(name, description)
-      (singleWriter ? cmd).mapTo[CragId].map(_.success)
+      Result((singleWriter ? cmd).mapTo[Validated[CragId]])
     }
 
     def createClimb(name: String, description: String, crag: CragId) = {
       val cmd = CreateClimbCmd(name, description, crag)
-      (singleWriter ? cmd).mapTo[Validated[ClimbId]]
+      Result((singleWriter ? cmd).mapTo[Validated[ClimbId]])
     }
 
     def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
       val cmd = MergeClimbsCmd(toKeep, toRemove)
-      (singleWriter ? cmd).mapTo[Validated[ClimbId]]
+      Result((singleWriter ? cmd).mapTo[Validated[ClimbId]])
     }
 
     def cragById(id: CragId): Future[Option[Crag]] = {
@@ -376,20 +376,20 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
         val event = CragCreated(id, cmd.name, cmd.description)
         persist(event) { e =>
           updateState(e)
-          sender ! id
+          sender ! id.right
         }
       }
 
       private[this] def handleClimbCreation(cmd: CreateClimbCmd) = {
         state.cragIds.contains(cmd.crag) match {
           case false =>
-            sender ! List("Specified crag does not exist").failure
+            sender ! List("Specified crag does not exist").left
           case true  =>
             val id = ClimbId.createRandom()
             val event = ClimbCreated(cmd.crag, id, cmd.name, cmd.description)
             persist(event) { e =>
               updateState(e)
-              sender ! id.success
+              sender ! id.right
             }
         }
       }
@@ -400,15 +400,15 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
         val toRemove = cmd.toRemove.v
 
         if (toKeep == toRemove) {
-          sender ! List("Cannot merge a climb with itself").failure
+          sender ! List("Cannot merge a climb with itself").left
         } else if (! state.concreteClimbIds.contains(toKeep) ||
                    ! state.concreteClimbIds.contains(toRemove)) {
-          sender ! List("Could not find both climb ids").failure
+          sender ! List("Could not find both climb ids").left
         } else {
           val event = ClimbsMerged(cmd.toKeep, cmd.toRemove)
           persist(event) { e =>
             updateState(e)
-            sender ! cmd.toKeep.v.success
+            sender ! cmd.toKeep.v.right
           }
         }
       }

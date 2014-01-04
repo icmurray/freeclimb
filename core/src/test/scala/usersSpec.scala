@@ -24,23 +24,23 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
     withUsersModule { module =>
       val user = blockFor {
         module.users.register(
-          Email("test@example.com"), "Test", "User", PlainText("pass"))
+          Email("test@example.com"), "Test", "User", PlainText("pass")).run
       }
-      user.isSuccess should equal (true)
+      user.isRight should equal (true)
     }
   }
 
   "A UserService" should "not re-register an existing user" in {
     withUsersModule { module =>
-      val user = blockFor {
+      implicit val ec = module.ec
+      val user = runCommand {
         module.users.register( Email("test@example.com"), "Test", "User", PlainText("pass"))
       }
-      user.isSuccess should equal (true)
 
       val sameUser = blockFor {
         module.users.register(Email(" test@example.com "), "Different", "Name", PlainText("pass"))
       }
-      sameUser.isSuccess should equal(false)
+      sameUser.isRight should equal(false)
     }
   }
 
@@ -49,7 +49,7 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
       val user = blockFor {
         module.users.register(Email("  "), "Test", "User", PlainText("pass"))
       }
-      user.isSuccess should equal (false)
+      user.isRight should equal (false)
     }
   }
 
@@ -61,7 +61,7 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
         for {
           userV <- module.users.register(
             Email("test@example.com"), "Test", "User", PlainText("pass")
-          )
+          ).run
           user = userV.getOrElse(throw new RuntimeException())
 
           auth <- module.users.authenticate(user.email, PlainText("pass"))
@@ -81,7 +81,7 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
         for {
           userV <- module.users.register(
             Email("test@example.com"), "Test", "User", PlainText("pass")
-          )
+          ).run
           user = userV.getOrElse(throw new RuntimeException())
 
           auth <- module.users.authenticate(user.email, PlainText("WRONG"))
@@ -100,7 +100,7 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
         for {
           userV <- module.users.register(
             Email("test@example.com"), "Test", "User", PlainText("pass")
-          )
+          ).run
           user = userV.getOrElse(throw new RuntimeException())
 
           tokenO <- module.users.login(user.email, PlainText("pass"))
@@ -144,6 +144,19 @@ class UserServiceSpec extends FlatSpec with ShouldMatchers {
 
   private def blockFor[T](f: => Future[T]): T = {
     Await.result(f, 2.seconds)
+  }
+
+  private def blockFor[T](f: => ValidatedT[Future, T]): Validated[T] = {
+    Await.result(f.run, 2.seconds)
+  }
+
+  private def runCommand[T](f: => ValidatedT[Future, T])(implicit ec: ExecutionContext): T = {
+    blockFor {
+      f.run.flatMap(_.fold(
+        left  => future { throw new Exception(left.toString) },
+        right => future { right }
+      ))
+    }
   }
 
   private def withUsersModule(f: UsersModule[Future] with ActorSystemModule => Unit) = {

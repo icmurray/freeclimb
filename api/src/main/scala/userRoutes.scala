@@ -68,7 +68,7 @@ trait UserRoutes[M[+_]] extends Directives
                                    regDetails.firstName,
                                    regDetails.lastName,
                                    PlainText(regDetails.password))
-                   .map(_.map(UserRegistered(_)))
+                   .map(UserRegistered(_)).run
             }
           }
         }

@@ -27,17 +27,18 @@ trait DomainErrorMarshalling {
 
     ToResponseMarshaller.of[Validated[T]](ContentTypes.`application/json`) {
         (value, contentType, ctx) =>
-      value match {
-        case Success(t) => mT(t, ctx)
-        case Failure(e) =>
-
+      value.fold(
+        left  => {
           // Need to be explicit about the DomainError marshaller, as a
           // DomainError is just an alias for List[String].
           val domainErrorResponseMarshaller = ToResponseMarshaller.fromMarshaller(
             status=StatusCodes.BadRequest)(
             SprayJsonSupport.sprayJsonMarshaller[DomainError](domainErrorJson))
-          domainErrorResponseMarshaller(e, ctx)
-      }
+          domainErrorResponseMarshaller(left, ctx)
+        },
+
+        right => mT(right, ctx)
+      )
     }
   }
 }
