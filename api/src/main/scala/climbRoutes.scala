@@ -41,6 +41,18 @@ object ClimbResource extends SupportJsonFormats {
   implicit val asJson = jsonFormat(ClimbResource.apply _, "id", "name", "description", "crag")
 }
 
+case class ListingResource[T](
+    results: Seq[T],
+    total: Int)
+
+object ListingResource {
+  def fromSeq[T](ts: Seq[T]): ListingResource[T] = {
+    ListingResource(ts, ts.length)
+  }
+
+  implicit def asJson[T : JsonFormat] = jsonFormat(ListingResource.apply[T] _, "results", "total")
+}
+
 trait ClimbRoutes[M[+_]] extends Directives
                             with UtilFormats
                             with RouteUtils
@@ -58,6 +70,11 @@ trait ClimbRoutes[M[+_]] extends Directives
               routesDB.createClimb(climb.name, climb.description, CragId(climb.cragUUID)).run
             }
           }
+        }
+      } ~
+      get {
+        complete {
+          routesDB.climbs.map(_.map(ClimbResource(_))).map(ListingResource.fromSeq)
         }
       }
     } ~

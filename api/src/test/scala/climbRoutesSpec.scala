@@ -142,6 +142,26 @@ class ClimbRoutesSpec extends FlatSpec with ShouldMatchers
     }
   }
 
+  "GET /climbs" should "list all climbs" in {
+    withClimbsEndpoint { module =>
+
+      val someClimbs = List(
+        Climb(ClimbId.createRandom(), CragId.createRandom(), "Climb 1", ""),
+        Climb(ClimbId.createRandom(), CragId.createRandom(), "Climb 2", ""),
+        Climb(ClimbId.createRandom(), CragId.createRandom(), "Climb 3", ""))
+
+      (module.routesDB.climbs _)
+        .expects()
+        .returning(someClimbs)
+
+      Get("/climbs") ~> module.climbRoutes ~> check {
+        status should equal (StatusCodes.OK)
+        val json = responseAs[JsObject]
+        json.fields("total") should equal(JsNumber(3))
+      }
+    }
+  }
+
   private def newClimb(name: String, description: String = "") = {
     Climb(ClimbId.createRandom(), CragId.createRandom(), name, description)
   }
