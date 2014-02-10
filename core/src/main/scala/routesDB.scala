@@ -253,8 +253,7 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
      */
     private class RoutesDatabase extends EventsourcedProcessor {
 
-      private[this] var crags = CragsRepo()
-      private[this] var climbs = ClimbsRepo()
+      private[this] var repo = Repo()
 
       override def processorId = sharedProcessorId
 
@@ -270,22 +269,22 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
        */
       val receiveCommand: Receive = {
         case CragByIdQ(id) =>
-          sender ! crags.byId.get(id)
+          sender ! repo.crags.byId.get(id)
 
         case ClimbByIdQ(id) =>
-          sender ! climbs.byId.get(id)
+          sender ! repo.climbs.byId.get(id)
 
         case ClimbResolvesToQ(id) =>
           sender ! resolveClimb(id)
 
         case ListCragsQ =>
-          sender ! crags.byId.values.toSeq
+          sender ! repo.crags.byId.values.toSeq
 
         case ListClimbsQ =>
-          sender ! climbs.byId.values.toSeq
+          sender ! repo.climbs.byId.values.toSeq
 
         case ListClimbsOfQ(cragId) =>
-          sender ! climbs.byCrag.get(cragId).getOrElse(Seq())
+          sender ! repo.climbs.byCrag.get(cragId).getOrElse(Seq())
 
         case p@Persistent(e: RoutesDBEvent,_) =>
           updateState(e)
@@ -301,13 +300,12 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
 
       private[this] def updateState(e: RoutesDBEvent) = e match {
         case CragCreated(id, name, desc) =>
-          crags = crags.addCrag((Crag(id, name, desc, Set())))
+          repo = repo.addCrag((Crag(id, name, desc, Set())))
         case ClimbCreated(cragId, climbId, name, description) =>
           val climb = Climb(climbId, cragId, name, description)
-          climbs = climbs.addClimb(climb)
-          crags = crags.addClimb(climb)
+          repo = repo.addClimb(climb)
         case ClimbsMerged(kept, removed) =>
-          climbs = climbs.mergeClimbs(kept, removed)
+          repo = repo.mergeClimbs(kept, removed)
       }
 
       /**
@@ -319,16 +317,29 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
        */
       @annotation.tailrec
       private[this] def resolveClimb(id: ClimbId): Option[Climb] = {
-        climbs.redirects.get(id) match {
+        repo.climbs.redirects.get(id) match {
           case None                            => None
           case r@Some(climb) if climb.id == id => r
           case Some(climb)                     => resolveClimb(climb.id)
         }
       }
 
-      /**
-       * The projection class itself.
-       */
+      private[this] case class Repo(
+          crags: CragsRepo = CragsRepo(),
+          climbs: ClimbsRepo = ClimbsRepo()) {
+
+        def addCrag(crag: Crag) = this.copy(
+          crags = crags.addCrag(crag))
+
+        def addClimb(climb: Climb) = this.copy(
+          crags = crags.addClimb(climb),
+          climbs = climbs.addClimb(climb))
+
+        def mergeClimbs(toKeep: Keep[ClimbId], toRemove: Remove[ClimbId]) = {
+          this.copy(climbs = climbs.mergeClimbs(toKeep, toRemove))
+        }
+      }
+
       private[this] case class CragsRepo(
           byId: Map[CragId, Crag] = Map()) {
 
@@ -367,9 +378,6 @@ trait EventsourcedRoutesDatabaseModule extends RoutesDatabaseModule[Future] {
 
         private[this] def adjust[A,B](m: Map[A,B], k: A)(f: Option[B] => B) = m.updated(k, f(m.get(k)))
       }
-
-
-
     }
 
     /**
