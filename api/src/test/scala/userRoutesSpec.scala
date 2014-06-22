@@ -1,5 +1,7 @@
 package org.freeclimbers.api
 
+import java.io.{FileWriter, File}
+
 import scala.concurrent.{Future, future}
 
 import org.scalamock.scalatest.MockFactory
@@ -27,6 +29,33 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
                                       with ScalatestRouteTest
                                       with MockFactory {
 
+  override val suiteName = "User API"
+
+  val wikiPage = new File("users.md")
+  wikiPage.delete()
+
+  private def writeToWiki(request: HttpRequest,
+                          response: HttpResponse,
+                          file: File): Unit = {
+    file.synchronized {
+      val w = new FileWriter(file, true)
+      try {
+        w.write("# " + suiteName + "\n")
+        w.write("## POST " + request.uri.path + "\n\n")
+        w.write("HEADERS:\n")
+        request.headers.foreach(h => w.write(h.toString))
+        w.write("\n```json\n")
+        w.write(request.entity.asString)
+        w.write("\n```\n")
+        response.headers.foreach(h => w.write(h.toString))
+        w.write("\n```json\n")
+        w.write(response.entity.asString)
+        w.write("\n```\n```")
+      } finally {
+        w.close()
+      }
+    }
+  }
 
   "/users" should "register new users" in {
     withUsersEndpoint { module =>
@@ -49,7 +78,11 @@ class UserRoutesSpec extends FlatSpec with ShouldMatchers
         .expects(email, firstName, lastName, plaintext)
         .returning(CResult(newUser(email, firstName, lastName, plaintext).right))
 
-      Post("/user", json) ~> module.userRoutes ~> check {
+      val request = Post("/user", json)
+      request ~> module.userRoutes ~> check {
+
+        writeToWiki(request, response, wikiPage)
+
         status should equal (StatusCodes.Created)
         val user = responseAs[JsObject]
         user.fields("email") should equal (JsString(email.s))
